@@ -121,11 +121,11 @@ export default function Home() {
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
               Focused archetypes beat broad promises in v1.
             </h2>
-            <p className="mt-4 max-w-xl text-base leading-8 text-[var(--color-muted)]">
-              This prototype intentionally maps prompts into a narrow set of supported archetypes so
-              the generated config and rendered shell stay deterministic and implementation-friendly.
-            </p>
-          </div>
+              <p className="mt-4 max-w-xl text-base leading-8 text-[var(--color-muted)]">
+               This prototype intentionally constrains prompts into a narrow contract so LLM-generated
+               app specs stay believable, valid, and implementation-friendly.
+              </p>
+            </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             {supportedAppTypes.map((type) => (

@@ -7,6 +7,7 @@ type RuntimeStatusCardProps = {
   isPending: boolean;
   canStart: boolean;
   onStart: () => void;
+  onRestart: () => void;
   onStop: () => void;
 };
 
@@ -15,6 +16,7 @@ export function RuntimeStatusCard({
   isPending,
   canStart,
   onStart,
+  onRestart,
   onStop,
 }: RuntimeStatusCardProps) {
   const status = session?.status ?? "stopped";
@@ -36,6 +38,14 @@ export function RuntimeStatusCard({
           className="rounded-full bg-[var(--color-ink)] px-3.5 py-2 text-xs font-medium text-white transition hover:bg-[var(--color-ink-soft)] disabled:cursor-not-allowed disabled:bg-[var(--color-muted)]"
         >
           {isPending && !isActive ? "Starting..." : "Run app"}
+        </button>
+        <button
+          type="button"
+          onClick={onRestart}
+          disabled={!canStart || isPending}
+          className="rounded-full border border-black/10 bg-white px-3.5 py-2 text-xs font-medium text-[var(--color-ink)] transition hover:border-black/20 disabled:cursor-not-allowed disabled:text-[var(--color-muted)]"
+        >
+          Restart
         </button>
         <button
           type="button"

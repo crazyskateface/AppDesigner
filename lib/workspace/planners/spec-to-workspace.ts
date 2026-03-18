@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import type { AppSpec } from "@/lib/domain/app-spec";
 import type { WorkspacePlan } from "@/lib/workspace/model";
@@ -8,7 +9,8 @@ import {
 } from "@/lib/workspace/templates/vite-react";
 
 function createWorkspaceId(spec: AppSpec) {
-  return `workspace-${spec.appId}`;
+  const versionHash = createHash("sha1").update(JSON.stringify(spec)).digest("hex").slice(0, 8);
+  return `workspace-${spec.appId}-${versionHash}`;
 }
 
 export function specToWorkspacePlan(spec: AppSpec, projectId: string): WorkspacePlan {

@@ -12,6 +12,7 @@ type RuntimePreviewPanelProps = {
   isPending: boolean;
   canStart: boolean;
   onStart: () => void;
+  onRestart: () => void;
   onStop: () => void;
   schemaPreview: ReactNode;
 };
@@ -22,6 +23,7 @@ export function RuntimePreviewPanel({
   isPending,
   canStart,
   onStart,
+  onRestart,
   onStop,
   schemaPreview,
 }: RuntimePreviewPanelProps) {
@@ -34,6 +36,7 @@ export function RuntimePreviewPanel({
         isPending={isPending}
         canStart={canStart}
         onStart={onStart}
+        onRestart={onRestart}
         onStop={onStop}
       />
 

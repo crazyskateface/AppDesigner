@@ -55,6 +55,21 @@ export async function stopRuntime(runtimeId: string) {
   return parseJsonResponse<RuntimeSession>(response);
 }
 
+export async function awaitRuntimeReady(runtimeId: string, attempts = 30, delayMs = 1_000) {
+  let current = await getRuntimeSnapshot(runtimeId);
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (current.status === "running" || current.status === "failed" || current.status === "stopped") {
+      return current;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    current = await getRuntimeSnapshot(runtimeId);
+  }
+
+  return current;
+}
+
 export function takeRecentRuntimeLogs(entries: RuntimeLogEntry[], count = 8) {
   return entries.slice(-count);
 }

@@ -1,16 +1,29 @@
 import { z } from "zod";
 
-export const builderRequestSchema = z.object({
-  prompt: z.string().trim().min(20, "Prompt must be at least 20 characters long."),
-});
+export const builderModeValues = ["create", "edit"] as const;
+export const builderModeSchema = z.enum(builderModeValues);
 
-export const appArchetypeSchema = z.enum(["crm", "booking", "creator", "inventory"]);
-export const fieldTypeSchema = z.enum(["text", "number", "date", "status"]);
-export const sectionTypeSchema = z.enum(["stats", "table", "list", "activity", "form"]);
-export const pageTypeSchema = z.enum(["dashboard", "list", "calendar", "settings"]);
-export const pageLayoutSchema = z.enum(["stack", "two-column", "dashboard"]);
-export const sectionPlacementSchema = z.enum(["main", "secondary", "full"]);
-export const sectionEmphasisSchema = z.enum(["default", "hero", "compact"]);
+export const builderPromptSchema = z.string().trim().min(20, "Prompt must be at least 20 characters long.");
+
+export const appArchetypeValues = ["crm", "booking", "creator", "inventory"] as const;
+export const fieldTypeValues = ["text", "number", "date", "status"] as const;
+export const sectionTypeValues = ["stats", "table", "list", "activity", "form"] as const;
+export const pageTypeValues = ["dashboard", "list", "calendar", "settings"] as const;
+export const pageLayoutValues = ["stack", "two-column", "dashboard"] as const;
+export const sectionPlacementValues = ["main", "secondary", "full"] as const;
+export const sectionEmphasisValues = ["default", "hero", "compact"] as const;
+export const generationSourceValues = ["llm", "fallback"] as const;
+export const generationFallbackReasonValues = ["missing_api_key", "provider_error", "parse_error", "validation_error"] as const;
+
+export const appArchetypeSchema = z.enum(appArchetypeValues);
+export const fieldTypeSchema = z.enum(fieldTypeValues);
+export const sectionTypeSchema = z.enum(sectionTypeValues);
+export const pageTypeSchema = z.enum(pageTypeValues);
+export const pageLayoutSchema = z.enum(pageLayoutValues);
+export const sectionPlacementSchema = z.enum(sectionPlacementValues);
+export const sectionEmphasisSchema = z.enum(sectionEmphasisValues);
+export const generationSourceSchema = z.enum(generationSourceValues);
+export const generationFallbackReasonSchema = z.enum(generationFallbackReasonValues);
 
 export const entityFieldSchema = z.object({
   key: z.string().min(1),
@@ -34,7 +47,7 @@ export const sectionSchema = z.object({
   id: z.string().min(1),
   type: sectionTypeSchema,
   title: z.string().min(1),
-  entityId: z.string().optional(),
+  entityId: z.preprocess((value) => (value === null ? undefined : value), z.string().min(1).optional()),
   placement: sectionPlacementSchema.default("main"),
   emphasis: sectionEmphasisSchema.default("default"),
 });
@@ -95,6 +108,39 @@ export const appSpecSchema = z
     });
   });
 
+export const builderRequestSchema = z
+  .object({
+    prompt: builderPromptSchema,
+    mode: builderModeSchema.default("create"),
+    currentSpec: appSpecSchema.optional(),
+  })
+  .superRefine((request, ctx) => {
+    if (request.mode === "edit" && !request.currentSpec) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Edit mode requires a current app spec.",
+        path: ["currentSpec"],
+      });
+    }
+  });
+
+export const appSpecGenerationMetaSchema = z.object({
+  source: generationSourceSchema,
+  repaired: z.boolean(),
+  fallbackReason: generationFallbackReasonSchema.optional(),
+  provider: z
+    .object({
+      name: z.string().min(1),
+      model: z.string().min(1).optional(),
+    })
+    .optional(),
+});
+
+export const generateAppSpecResponseSchema = z.object({
+  appSpec: appSpecSchema,
+  generationMeta: appSpecGenerationMetaSchema,
+});
+
 export type BuilderRequest = z.infer<typeof builderRequestSchema>;
 export type AppArchetype = z.infer<typeof appArchetypeSchema>;
 export type FieldType = z.infer<typeof fieldTypeSchema>;
@@ -109,3 +155,6 @@ export type PageType = z.infer<typeof pageTypeSchema>;
 export type SectionPlacement = z.infer<typeof sectionPlacementSchema>;
 export type SectionEmphasis = z.infer<typeof sectionEmphasisSchema>;
 export type SectionType = z.infer<typeof sectionTypeSchema>;
+export type AppSpecGenerationMeta = z.infer<typeof appSpecGenerationMetaSchema>;
+export type GenerateAppSpecResponse = z.infer<typeof generateAppSpecResponseSchema>;
+export type BuilderMode = z.infer<typeof builderModeSchema>;

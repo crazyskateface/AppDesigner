@@ -2,7 +2,7 @@ import { archetypeTemplates } from "@/lib/domain/app-spec/archetypes";
 import { appSpecSchema, type AppSpec, type AppSpecPage, type EntityConfig } from "@/lib/domain/app-spec/schema";
 import { detectArchetype, deriveTitle, normalizePrompt, slugify } from "@/lib/domain/app-spec/parse";
 
-export function generateAppSpec(prompt: string): AppSpec {
+export function generateFallbackAppSpec(prompt: string): AppSpec {
   const normalizedPrompt = normalizePrompt(prompt);
   const archetype = detectArchetype(normalizedPrompt);
   const title = deriveTitle(normalizedPrompt, archetype);
@@ -24,6 +24,8 @@ export function generateAppSpec(prompt: string): AppSpec {
     pages,
   });
 }
+
+export const generateAppSpec = generateFallbackAppSpec;
 
 function deriveEntities(prompt: string, archetype: AppSpec["archetype"]): EntityConfig[] {
   const template = archetypeTemplates[archetype];

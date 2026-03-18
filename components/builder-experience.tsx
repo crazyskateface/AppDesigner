@@ -1,17 +1,26 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatHistoryPanel } from "@/components/builder/chat-history-panel";
 import { RuntimePreviewPanel } from "@/components/builder/runtime-preview-panel";
 import { WorkspaceTerminal } from "@/components/builder/workspace-terminal";
 import { AppShellPreview } from "@/components/preview/app-shell/app-shell-preview";
-import { generateAppSpec, type AppSpec } from "@/lib/domain/app-spec";
+import { generateAppSpecResponseSchema, type AppSpec } from "@/lib/domain/app-spec";
+import { resolveBuilderMode } from "@/lib/builder/generation-mode";
+import { replaceRuntimeForSpec, RuntimeReplacementError } from "@/lib/builder/runtime-flow";
 import type { PersistedProject } from "@/lib/persistence/local-projects/schema";
 import { loadLastOpenProject, loadProject, saveProject } from "@/lib/persistence/local-projects/storage";
 import { appSpecToPreviewModel } from "@/lib/preview/adapters/spec-to-preview";
-import { takeRecentRuntimeLogs, startRuntime, stopRuntime, getRuntimeLogs, getRuntimeSnapshot } from "@/lib/runtime/client/runtime-api";
+import {
+  awaitRuntimeReady,
+  takeRecentRuntimeLogs,
+  startRuntime,
+  stopRuntime,
+  getRuntimeLogs,
+  getRuntimeSnapshot,
+} from "@/lib/runtime/client/runtime-api";
 import type { RuntimeLogEntry } from "@/lib/runtime/logs";
 import type { RuntimeSession } from "@/lib/runtime/service/dto";
 
@@ -36,7 +45,9 @@ export function BuilderExperience() {
   const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogEntry[]>([]);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [isRuntimeActionPending, setIsRuntimeActionPending] = useState(false);
+  const [restoredProjectPendingAutoStart, setRestoredProjectPendingAutoStart] = useState(false);
   const runtimePollRef = useRef<number | null>(null);
+  const hasAttemptedRestoreRuntimeRef = useRef(false);
 
   const hasSpec = currentSpec !== null;
   const effectiveSpec = useMemo(() => currentSpec, [currentSpec]);
@@ -44,6 +55,72 @@ export function BuilderExperience() {
     () => (effectiveSpec ? appSpecToPreviewModel(effectiveSpec) : null),
     [effectiveSpec],
   );
+
+  const handleRestartRuntime = useCallback(async (
+    nextSpec: AppSpec,
+    options: {
+      previousRuntimeSession?: RuntimeSession | null;
+      preserveCurrentOnFailure: boolean;
+      onSpecCommitted?: (spec: AppSpec) => void;
+      successNotice?: string | null;
+    },
+  ) => {
+    setIsRuntimeActionPending(true);
+    setRuntimeError(null);
+
+    const previousRuntime = options.previousRuntimeSession ?? runtimeSession;
+    const nextProjectId = projectId ?? crypto.randomUUID();
+    const createdAt = projectCreatedAt ?? new Date().toISOString();
+
+    try {
+      if (!projectId) {
+        setProjectId(nextProjectId);
+      }
+
+      if (!projectCreatedAt) {
+        setProjectCreatedAt(createdAt);
+      }
+
+      const nextSession = await replaceRuntimeForSpec({
+        candidateSpec: nextSpec,
+        previousRuntime,
+        startRuntime: async (generatedSpec) =>
+          startRuntime({
+            projectId: nextProjectId,
+            generatedSpec,
+          }),
+        awaitRuntimeReady: async (session) => awaitRuntimeReady(session.runtimeId),
+        stopRuntime: async (runtimeId) => {
+          await stopRuntime(runtimeId);
+        },
+      });
+
+      options.onSpecCommitted?.(nextSpec);
+      setRuntimeSession(nextSession);
+      setRuntimeLogs([]);
+      setSessionNotice(options.successNotice ?? null);
+      setGenerationError(null);
+      setRestoredProjectPendingAutoStart(false);
+    } catch (error) {
+      if (error instanceof RuntimeReplacementError && error.failedSession?.runtimeId) {
+        try {
+          const logs = await getRuntimeLogs(error.failedSession.runtimeId);
+          setRuntimeLogs(takeRecentRuntimeLogs(logs.entries));
+        } catch {}
+      }
+
+      if (!options.preserveCurrentOnFailure && !currentSpec) {
+        setRuntimeSession(null);
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Could not restart the app runtime.";
+      setRuntimeError(message);
+      throw new Error(message);
+    } finally {
+      setIsRuntimeActionPending(false);
+    }
+  }, [currentSpec, projectCreatedAt, projectId, runtimeSession]);
 
   useEffect(() => {
     return () => {
@@ -113,6 +190,7 @@ export function BuilderExperience() {
 
     if (restoredProject) {
       restoreProject(restoredProject);
+      setRestoredProjectPendingAutoStart(Boolean(restoredProject.generatedSpec));
       setSessionNotice(
         requestedProjectId ? "Opened a saved local project." : "Restored your last local project.",
       );
@@ -120,6 +198,24 @@ export function BuilderExperience() {
 
     setHasHydratedPersistence(true);
   }, [requestedProjectId]);
+
+  useEffect(() => {
+    if (
+      !hasHydratedPersistence ||
+      hasAttemptedRestoreRuntimeRef.current ||
+      !restoredProjectPendingAutoStart ||
+      !currentSpec ||
+      !projectId
+    ) {
+      return;
+    }
+
+    hasAttemptedRestoreRuntimeRef.current = true;
+    void handleRestartRuntime(currentSpec, {
+      preserveCurrentOnFailure: false,
+      successNotice: "Restored your last local project and started the runtime.",
+    });
+  }, [currentSpec, handleRestartRuntime, hasHydratedPersistence, projectId, restoredProjectPendingAutoStart]);
 
   useEffect(() => {
     if (!previewModel) {
@@ -202,24 +298,69 @@ export function BuilderExperience() {
     setGenerationError(null);
 
     try {
-      if (runtimeSession?.runtimeId) {
-        await handleStopRuntime();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const mode = resolveBuilderMode(currentSpec);
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: trimmedPrompt,
+          mode,
+          currentSpec: mode === "edit" ? currentSpec : undefined,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        const message =
+          typeof payload === "object" &&
+          payload !== null &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "The server could not generate a valid app spec.";
+
+        throw new Error(message);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      const generatedSpec = generateAppSpec(trimmedPrompt);
-      const nextPreviewModel = appSpecToPreviewModel(generatedSpec);
+      const parsedResponse = generateAppSpecResponseSchema.safeParse(payload);
+
+      if (!parsedResponse.success) {
+        throw new Error("The server returned an invalid app spec payload.");
+      }
+
+      const { appSpec: generatedSpec, generationMeta } = parsedResponse.data;
       console.log("Generated AppSpec", generatedSpec);
-      setCurrentSpec(generatedSpec);
-      setRuntimeError(null);
-      setRuntimeLogs([]);
-      setSelectedPreviewPageId(
-        nextPreviewModel.navigation.some((item) => item.pageId === selectedPreviewPageId)
-          ? selectedPreviewPageId
-          : (nextPreviewModel.navigation[0]?.pageId ?? null),
-      );
-    } catch {
-      setGenerationError("The local builder could not generate a valid app spec from that prompt.");
+
+      const successNotice =
+        generationMeta.source === "fallback"
+          ? "OpenAI generation fell back to a safe baseline AppSpec."
+          : mode === "edit"
+            ? generationMeta.repaired
+              ? "Updated the app and normalized it to fit the AppSpec contract."
+              : "Updated the app."
+            : generationMeta.repaired
+              ? "Created the app and normalized it to fit the AppSpec contract."
+              : "Created the app.";
+
+      await handleRestartRuntime(generatedSpec, {
+        previousRuntimeSession: runtimeSession,
+        preserveCurrentOnFailure: Boolean(currentSpec),
+        onSpecCommitted: (committedSpec) => {
+          const nextPreviewModel = appSpecToPreviewModel(committedSpec);
+          setCurrentSpec(committedSpec);
+          setSelectedPreviewPageId(
+            nextPreviewModel.navigation.some((item) => item.pageId === selectedPreviewPageId)
+              ? selectedPreviewPageId
+              : (nextPreviewModel.navigation[0]?.pageId ?? null),
+          );
+        },
+        successNotice,
+      });
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "The builder could not apply that app update.");
     } finally {
       setIsLoading(false);
     }
@@ -230,38 +371,11 @@ export function BuilderExperience() {
       return;
     }
 
-    setIsRuntimeActionPending(true);
-    setRuntimeError(null);
-
-    try {
-      const nextProjectId = projectId ?? crypto.randomUUID();
-      const createdAt = projectCreatedAt ?? new Date().toISOString();
-
-      if (!projectId) {
-        setProjectId(nextProjectId);
-      }
-
-      if (!projectCreatedAt) {
-        setProjectCreatedAt(createdAt);
-      }
-
-      const session = await startRuntime({
-        projectId: nextProjectId,
-        generatedSpec: effectiveSpec,
-      });
-
-      setRuntimeSession(session);
-      setRuntimeLogs([]);
-
-      if (session.status === "failed") {
-        const logs = await getRuntimeLogs(session.runtimeId);
-        setRuntimeLogs(takeRecentRuntimeLogs(logs.entries));
-      }
-    } catch (error) {
-      setRuntimeError(error instanceof Error ? error.message : "Could not start live runtime preview.");
-    } finally {
-      setIsRuntimeActionPending(false);
-    }
+    await handleRestartRuntime(effectiveSpec, {
+      previousRuntimeSession: runtimeSession,
+      preserveCurrentOnFailure: true,
+      successNotice: "Started the runtime.",
+    });
   }
 
   async function handleStopRuntime() {
@@ -288,6 +402,7 @@ export function BuilderExperience() {
     setCurrentSpec(project.generatedSpec);
     setSelectedPreviewPageId(project.selectedPreviewPageId);
     setGenerationError(null);
+    hasAttemptedRestoreRuntimeRef.current = false;
   }
 
   return (
@@ -332,7 +447,7 @@ export function BuilderExperience() {
                 disabled={isLoading}
                 className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-[var(--color-ink)] px-5 py-3 text-sm font-medium text-white transition hover:bg-[var(--color-ink-soft)] disabled:cursor-not-allowed disabled:bg-[var(--color-muted)]"
               >
-                {isLoading ? "Generating..." : hasSpec ? "Regenerate app" : "Generate app"}
+                {isLoading ? "Working..." : hasSpec ? "Update app" : "Create app"}
               </button>
             </form>
           </section>
@@ -340,15 +455,24 @@ export function BuilderExperience() {
 
         <section className="grid min-h-0 gap-3 lg:grid-rows-[minmax(0,1fr)_auto]">
           <section className="min-h-0">
-            <RuntimePreviewPanel
-              session={runtimeSession}
-              error={runtimeError}
-              isPending={isRuntimeActionPending}
-              canStart={Boolean(effectiveSpec)}
-              onStart={() => void handleStartRuntime()}
-              onStop={() => void handleStopRuntime()}
-              schemaPreview={
-                <AppShellPreview
+              <RuntimePreviewPanel
+                session={runtimeSession}
+                error={runtimeError}
+                isPending={isRuntimeActionPending}
+                canStart={Boolean(effectiveSpec)}
+                onStart={() => void handleStartRuntime()}
+                onRestart={() => {
+                  if (effectiveSpec) {
+                    void handleRestartRuntime(effectiveSpec, {
+                      previousRuntimeSession: runtimeSession,
+                      preserveCurrentOnFailure: true,
+                      successNotice: "Restarted the runtime.",
+                    });
+                  }
+                }}
+                onStop={() => void handleStopRuntime()}
+                schemaPreview={
+                  <AppShellPreview
                   model={previewModel}
                   activePageId={selectedPreviewPageId}
                   onSelectPage={setSelectedPreviewPageId}
