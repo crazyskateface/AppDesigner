@@ -1,0 +1,15 @@
+export type {
+  AppArchetype,
+  AppSpec,
+  AppSpecPage,
+  AppSpecSection,
+  EntityConfig,
+  EntityField,
+  FieldType,
+  NavigationItem,
+  PageLayout,
+  PageType,
+  SectionEmphasis,
+  SectionPlacement,
+  SectionType,
+} from "@/lib/domain/app-spec/schema";
