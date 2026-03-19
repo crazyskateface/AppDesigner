@@ -21,7 +21,7 @@ export const generatedSourceBundleSchema = z
     packageRequirements: z.array(
       z.object({
         name: z.string().min(1),
-        version: z.string().min(1).optional(),
+        version: z.string().min(1).nullable().optional(),
         section: z.enum(["dependencies", "devDependencies"]).default("dependencies"),
       }),
     ).max(8).default([]),

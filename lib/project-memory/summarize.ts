@@ -3,6 +3,15 @@ import type { RuntimeSession } from "@/lib/runtime/service/dto";
 
 import type { ProjectBuildMemory } from "@/lib/project-memory/schema";
 
+const staleDecisionPatterns = [
+  /^Verified landed /i,
+  /^Verified page present/i,
+];
+
+export function isActionableDecision(summary: string): boolean {
+  return !staleDecisionPatterns.some((pattern) => pattern.test(summary));
+}
+
 export function summarizeAppSpecForProjectMemory(spec: AppSpec) {
   return {
     appTitle: spec.title,
@@ -42,7 +51,10 @@ export function buildProjectMemoryLlmSummary(memory: ProjectBuildMemory) {
     sections.push(`Latest prompt: ${recentPrompt.prompt}`);
   }
 
-  const decisions = memory.decisions.slice(-4).map((decision) => `- ${decision.summary}`);
+  const decisions = memory.decisions
+    .filter((decision) => isActionableDecision(decision.summary))
+    .slice(-4)
+    .map((decision) => `- ${decision.summary}`);
 
   if (decisions.length) {
     sections.push(["Key decisions:", ...decisions].join("\n"));

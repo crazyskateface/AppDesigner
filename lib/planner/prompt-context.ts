@@ -3,6 +3,7 @@ import { z } from "zod";
 import { type AppSpec, builderModeSchema } from "@/lib/domain/app-spec";
 import { normalizePrompt } from "@/lib/domain/app-spec/parse";
 import type { ProjectBuildMemory } from "@/lib/project-memory/schema";
+import { isActionableDecision } from "@/lib/project-memory/summarize";
 
 export const clarificationAnswerSchema = z.object({
   questionId: z.string().min(1),
@@ -35,7 +36,10 @@ export function buildPromptContextEnvelope(input: {
     mode: input.mode ?? "create",
     clarificationAnswers: input.clarificationAnswers ?? [],
     projectMemorySummary: input.projectMemory?.llmContextSummary || undefined,
-    activeDecisions: input.projectMemory?.decisions.slice(-6).map((decision) => decision.summary) ?? [],
+    activeDecisions: input.projectMemory?.decisions
+      .filter((decision) => isActionableDecision(decision.summary))
+      .slice(-6)
+      .map((decision) => decision.summary) ?? [],
     activeConstraints: input.projectMemory?.constraints.slice(-6).map((constraint) => constraint.text) ?? [],
     currentSpecSummary: input.currentSpec ? summarizeCurrentSpec(input.currentSpec) : undefined,
   });

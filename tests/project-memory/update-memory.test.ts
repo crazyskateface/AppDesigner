@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { generateFallbackAppSpec } from "@/lib/domain/app-spec/generate";
 import { buildPromptContextEnvelope, formatPromptContextForLlm } from "@/lib/planner/prompt-context";
+import { isActionableDecision } from "@/lib/project-memory/summarize";
 import {
   createEmptyProjectBuildMemory,
   rememberClarificationAnswers,
@@ -118,4 +119,60 @@ test("project memory LLM summary excludes stale page titles and archetype", () =
   assert.doesNotMatch(summary, /Clients/);
   assert.doesNotMatch(summary, /Settings/);
   assert.doesNotMatch(summary, /archetype/i);
+});
+
+test("isActionableDecision excludes stale verified-landed and verified-page decisions", () => {
+  assert.equal(isActionableDecision("Verified landed file change in src/App.tsx."), false);
+  assert.equal(isActionableDecision("Verified page present: Dashboard."), false);
+  assert.equal(isActionableDecision("Verified landed file change in src/components/Sidebar.tsx."), false);
+  assert.equal(isActionableDecision("Use minimal navigation for the app shell."), true);
+  assert.equal(isActionableDecision("User prefers dark mode as default."), true);
+});
+
+test("buildProjectMemoryLlmSummary excludes stale verified decisions", () => {
+  const memory = createEmptyProjectBuildMemory("project-1");
+
+  memory.decisions = [
+    { id: "d1", summary: "Verified landed file change in src/App.tsx.", source: "generation", createdAt: "2026-03-19T00:00:00.000Z" },
+    { id: "d2", summary: "Verified page present: Overview.", source: "generation", createdAt: "2026-03-19T00:00:01.000Z" },
+    { id: "d3", summary: "Use card-based layout for the dashboard.", source: "generation", createdAt: "2026-03-19T00:00:02.000Z" },
+  ];
+
+  const result = rememberPromptSubmission(memory, {
+    prompt: "Change the header color.",
+    mode: "edit",
+    timestamp: "2026-03-19T00:01:00.000Z",
+  });
+
+  const summary = result.memory.llmContextSummary;
+
+  assert.doesNotMatch(summary, /Verified landed/i);
+  assert.doesNotMatch(summary, /Verified page present/i);
+  assert.match(summary, /card-based layout/);
+});
+
+test("buildPromptContextEnvelope excludes stale verified decisions from activeDecisions", () => {
+  const memory = createEmptyProjectBuildMemory("project-1");
+
+  memory.decisions = [
+    { id: "d1", summary: "Verified landed file change in src/App.tsx.", source: "generation", createdAt: "2026-03-19T00:00:00.000Z" },
+    { id: "d2", summary: "Verified page present: Clients.", source: "generation", createdAt: "2026-03-19T00:00:01.000Z" },
+    { id: "d3", summary: "Prefer tabbed navigation.", source: "generation", createdAt: "2026-03-19T00:00:02.000Z" },
+  ];
+
+  const result = rememberPromptSubmission(memory, {
+    prompt: "Simplify the nav.",
+    mode: "edit",
+    timestamp: "2026-03-19T00:01:00.000Z",
+  });
+
+  const context = buildPromptContextEnvelope({
+    prompt: "Simplify the nav.",
+    mode: "edit",
+    projectMemory: result.memory,
+  });
+
+  assert.ok(!context.activeDecisions.some((d) => /Verified landed/i.test(d)));
+  assert.ok(!context.activeDecisions.some((d) => /Verified page present/i.test(d)));
+  assert.ok(context.activeDecisions.some((d) => /tabbed navigation/i.test(d)));
 });

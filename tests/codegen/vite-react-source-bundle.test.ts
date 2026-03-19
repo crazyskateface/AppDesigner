@@ -255,3 +255,36 @@ test("generatedSourceBundleJsonSchema is strict-mode compliant: all properties i
 
   checkStrictMode(generatedSourceBundleJsonSchema, "root");
 });
+
+test("generatedSourceBundleJsonSchema version field has no minLength (safe for nullable)", () => {
+  const pkgReqs = generatedSourceBundleJsonSchema.properties as Record<string, Record<string, unknown>>;
+  const items = pkgReqs.packageRequirements.items as Record<string, unknown>;
+  const versionProp = (items.properties as Record<string, Record<string, unknown>>).version;
+
+  assert.deepEqual(versionProp.type, ["string", "null"]);
+  assert.equal(versionProp.minLength, undefined, "nullable version field should not have minLength");
+});
+
+test("Zod source bundle schema accepts packageRequirements with version: null", async () => {
+  const brief = createProjectBriefFromAppSpec(generateFallbackAppSpec("Build a CRM."));
+
+  const result = await generateViteReactAppFilesFromProjectBrief(brief, {
+    provider: new StubProvider({
+      bundleId: "null-version-bundle",
+      targetKind: "vite-react-static",
+      entryModule: "src/App.tsx",
+      files: [
+        { path: "src/App.tsx", kind: "source", content: 'export default function App() { return <div>CRM</div>; }' },
+        { path: "src/styles.css", kind: "source", content: "body { margin: 0; }" },
+      ],
+      packageRequirements: [
+        { name: "recharts", section: "dependencies", version: null },
+      ],
+      notes: [],
+    }),
+  });
+
+  assert.ok(result.packageRequirements);
+  assert.equal(result.packageRequirements.length, 1);
+  assert.equal(result.packageRequirements[0].name, "recharts");
+});
