@@ -21,7 +21,6 @@ export const generatedSourceBundleSchema = z
     packageRequirements: z.array(
       z.object({
         name: z.string().min(1),
-        version: z.string().min(1).nullable().optional(),
         section: z.enum(["dependencies", "devDependencies"]).default("dependencies"),
       }),
     ).max(8).default([]),
@@ -180,12 +179,11 @@ function normalizePackageRequirements(value: unknown) {
   }
 
   const seen = new Set<string>();
-  const normalized: Array<{ name: string; version?: string; section: "dependencies" | "devDependencies" }> = [];
+  const normalized: Array<{ name: string; section: "dependencies" | "devDependencies" }> = [];
 
   for (const item of value) {
     const record = isRecord(item) ? item : {};
     const name = normalizeText(record.name);
-    const version = normalizeText(record.version) || undefined;
     const section = record.section === "devDependencies" ? "devDependencies" : "dependencies";
 
     if (!name || seen.has(`${section}:${name.toLowerCase()}`)) {
@@ -195,7 +193,6 @@ function normalizePackageRequirements(value: unknown) {
     seen.add(`${section}:${name.toLowerCase()}`);
     normalized.push({
       name,
-      version,
       section,
     });
   }

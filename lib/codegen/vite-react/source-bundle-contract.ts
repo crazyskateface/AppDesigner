@@ -116,10 +116,9 @@ export const generatedSourceBundleJsonSchema: Record<string, unknown> = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "section", "version"],
+        required: ["name", "section"],
         properties: {
           name: { type: "string", minLength: 1 },
-          version: { type: ["string", "null"] },
           section: { type: "string", enum: ["dependencies", "devDependencies"] },
         },
       },

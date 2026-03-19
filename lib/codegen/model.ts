@@ -2,7 +2,6 @@ import type { WorkspaceFile, WorkspaceManifest, WorkspaceTargetKind } from "@/li
 
 export type GeneratedPackageRequirement = {
   name: string;
-  version?: string;
   section: "dependencies" | "devDependencies";
 };
 

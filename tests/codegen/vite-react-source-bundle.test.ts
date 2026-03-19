@@ -98,7 +98,7 @@ test("LLM app-files generator preserves bounded package requirements and richer 
   });
 
   assert.equal(result.files.some((file) => file.path === "src/pages/DashboardPage.tsx"), true);
-  assert.deepEqual(result.packageRequirements, [{ name: "react-router-dom", version: undefined, section: "dependencies" }]);
+  assert.deepEqual(result.packageRequirements, [{ name: "react-router-dom", section: "dependencies" }]);
 });
 
 test("source bundle validation rejects disallowed generated file paths", () => {
@@ -184,47 +184,6 @@ test("package action executor rejects unsafe package specs", () => {
   );
 });
 
-test("LLM app-files generator accepts packageRequirements with null version", async () => {
-  const brief = createProjectBriefFromAppSpec(generateFallbackAppSpec("Build a CRM with charts."));
-
-  const result = await generateViteReactAppFilesFromProjectBrief(brief, {
-    provider: new StubProvider({
-      bundleId: "version-null-bundle",
-      targetKind: "vite-react-static",
-      entryModule: "src/App.tsx",
-      files: [
-        {
-          path: "src/App.tsx",
-          kind: "source",
-          content: 'export default function App() { return <div>Charts</div>; }',
-        },
-        {
-          path: "src/styles.css",
-          kind: "source",
-          content: "body { margin: 0; }",
-        },
-      ],
-      packageRequirements: [
-        {
-          name: "recharts",
-          section: "dependencies",
-          version: null,
-        },
-      ],
-      notes: [],
-    }),
-  });
-
-  assert.ok(result.packageRequirements);
-  assert.equal(result.packageRequirements!.length, 1);
-  assert.equal(result.packageRequirements![0].name, "recharts");
-  // version should be undefined or null (normalized away)
-  assert.ok(
-    result.packageRequirements![0].version === undefined || result.packageRequirements![0].version === null,
-    "null version should be accepted",
-  );
-});
-
 test("generatedSourceBundleJsonSchema is strict-mode compliant: all properties in required", () => {
   function checkStrictMode(schema: Record<string, unknown>, path: string) {
     if (schema.type !== "object" || !schema.additionalProperties === false) {
@@ -256,35 +215,12 @@ test("generatedSourceBundleJsonSchema is strict-mode compliant: all properties i
   checkStrictMode(generatedSourceBundleJsonSchema, "root");
 });
 
-test("generatedSourceBundleJsonSchema version field has no minLength (safe for nullable)", () => {
+test("generatedSourceBundleJsonSchema packageRequirements items have no version field", () => {
   const pkgReqs = generatedSourceBundleJsonSchema.properties as Record<string, Record<string, unknown>>;
   const items = pkgReqs.packageRequirements.items as Record<string, unknown>;
-  const versionProp = (items.properties as Record<string, Record<string, unknown>>).version;
+  const properties = items.properties as Record<string, unknown>;
+  const required = items.required as string[];
 
-  assert.deepEqual(versionProp.type, ["string", "null"]);
-  assert.equal(versionProp.minLength, undefined, "nullable version field should not have minLength");
-});
-
-test("Zod source bundle schema accepts packageRequirements with version: null", async () => {
-  const brief = createProjectBriefFromAppSpec(generateFallbackAppSpec("Build a CRM."));
-
-  const result = await generateViteReactAppFilesFromProjectBrief(brief, {
-    provider: new StubProvider({
-      bundleId: "null-version-bundle",
-      targetKind: "vite-react-static",
-      entryModule: "src/App.tsx",
-      files: [
-        { path: "src/App.tsx", kind: "source", content: 'export default function App() { return <div>CRM</div>; }' },
-        { path: "src/styles.css", kind: "source", content: "body { margin: 0; }" },
-      ],
-      packageRequirements: [
-        { name: "recharts", section: "dependencies", version: null },
-      ],
-      notes: [],
-    }),
-  });
-
-  assert.ok(result.packageRequirements);
-  assert.equal(result.packageRequirements.length, 1);
-  assert.equal(result.packageRequirements[0].name, "recharts");
+  assert.equal(properties.version, undefined, "version should not be in properties");
+  assert.ok(!required.includes("version"), "version should not be in required");
 });
