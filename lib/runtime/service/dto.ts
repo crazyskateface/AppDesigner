@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { appSpecSchema } from "@/lib/domain/app-spec";
-import type { WorkspaceEditChangeSet } from "@/lib/builder/edits/schema";
+import type { WorkspaceEditChangeSet, WorkspaceEditSkippedFile } from "@/lib/builder/edits/schema";
 import type { CodeChangeDiff } from "@/lib/builder/verification/schema";
 import { projectBuildMemorySchema } from "@/lib/project-memory/schema";
 import { workspaceFileSchema } from "@/lib/workspace/schemas";
@@ -106,6 +106,7 @@ export type RuntimeUpdateResult = {
   editChangeSet?: Pick<WorkspaceEditChangeSet, "changeSetId" | "summary"> & {
     operationPaths: string[];
     rejectedPaths: string[];
+    skippedFiles: WorkspaceEditSkippedFile[];
   };
   codeVerification?: {
     generatedPaths: string[];

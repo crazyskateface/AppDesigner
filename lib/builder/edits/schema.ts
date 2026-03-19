@@ -16,6 +16,13 @@ export const workspaceEditOperationSchema = z.object({
   reason: z.string().min(1),
 });
 
+export const workspaceEditSkipReasonSchema = z.enum(["identical-content", "path-not-allowed"]);
+
+export const workspaceEditSkippedFileSchema = z.object({
+  path: z.string().min(1),
+  reason: workspaceEditSkipReasonSchema,
+});
+
 export const workspaceEditChangeSetSchema = z.object({
   changeSetId: z.string().min(1),
   projectId: z.string().min(1),
@@ -26,7 +33,9 @@ export const workspaceEditChangeSetSchema = z.object({
   source: z.enum(["plan-diff"]).default("plan-diff"),
   repairNotes: z.array(z.string().min(1)).default([]),
   operations: z.array(workspaceEditOperationSchema).max(40),
+  skippedFiles: z.array(workspaceEditSkippedFileSchema).default([]),
 });
 
 export type WorkspaceEditOperation = z.infer<typeof workspaceEditOperationSchema>;
+export type WorkspaceEditSkippedFile = z.infer<typeof workspaceEditSkippedFileSchema>;
 export type WorkspaceEditChangeSet = z.infer<typeof workspaceEditChangeSetSchema>;

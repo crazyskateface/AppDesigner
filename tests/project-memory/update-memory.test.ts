@@ -92,3 +92,30 @@ test("prompt context includes project memory summary, decisions, and constraints
   assert.match(formatted, /Active decisions:/);
   assert.match(formatted, /Solo consultants, not teams/i);
 });
+
+test("project memory LLM summary excludes stale page titles and archetype", () => {
+  const memory = createEmptyProjectBuildMemory("project-1");
+
+  // Simulate storing page titles and archetype like the old AppSpec flow would
+  memory.projectState.appTitle = "Booking Dashboard";
+  memory.projectState.archetype = "booking";
+  memory.projectState.pageTitles = ["Overview", "Appointments", "Clients", "Settings"];
+
+  const result = rememberPromptSubmission(memory, {
+    prompt: "Change the landing page layout.",
+    mode: "edit",
+    timestamp: "2026-03-19T00:00:00.000Z",
+  });
+
+  const summary = result.memory.llmContextSummary;
+
+  // appTitle should still be present (useful context)
+  assert.match(summary, /Booking Dashboard/);
+
+  // pageTitles should NOT appear in the LLM summary
+  assert.doesNotMatch(summary, /Overview/);
+  assert.doesNotMatch(summary, /Appointments/);
+  assert.doesNotMatch(summary, /Clients/);
+  assert.doesNotMatch(summary, /Settings/);
+  assert.doesNotMatch(summary, /archetype/i);
+});

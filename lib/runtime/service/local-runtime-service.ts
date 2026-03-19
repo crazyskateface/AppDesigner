@@ -205,6 +205,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: editValidation.rejectedPaths,
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification: {
           generatedPaths: generatedFileDiffs.map((diff) => diff.path),
@@ -235,6 +236,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification: {
           generatedPaths: generatedFileDiffs.map((diff) => diff.path),
@@ -309,6 +311,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification,
         reason: "The live container is not available, so the runtime must be started again.",
@@ -340,6 +343,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification,
       };
@@ -360,6 +364,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification,
         reason: "This runtime was started before dev-server process controls were available inside the container.",
@@ -391,6 +396,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification,
         reason: "Hot reload was not enough, so the dev server was restarted inside the existing container.",
@@ -419,6 +425,7 @@ export class LocalRuntimeService implements RuntimeService {
           summary: editChangeSet.summary,
           operationPaths: editChangeSet.operations.map((operation) => operation.path),
           rejectedPaths: [],
+          skippedFiles: editChangeSet.skippedFiles,
         },
         codeVerification,
         reason:

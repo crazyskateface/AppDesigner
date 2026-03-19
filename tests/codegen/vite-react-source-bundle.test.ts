@@ -7,6 +7,7 @@ import { createProjectBriefFromAppSpec } from "@/lib/planner/app-spec-to-project
 import { generateViteReactAppFilesFromProjectBrief } from "@/lib/codegen/vite-react/llm-app-files";
 import { validateGeneratedSourceBundleCandidate } from "@/lib/codegen/vite-react/source-bundle-normalize";
 import { executePackageAction } from "@/lib/applications/orchestrator/executors/package-action-executor";
+import { generatedSourceBundleJsonSchema } from "@/lib/codegen/vite-react/source-bundle-contract";
 
 class StubProvider implements StructuredObjectGenerator {
   constructor(private readonly value: unknown, private readonly shouldThrow = false) {}
@@ -222,4 +223,35 @@ test("LLM app-files generator accepts packageRequirements with null version", as
     result.packageRequirements![0].version === undefined || result.packageRequirements![0].version === null,
     "null version should be accepted",
   );
+});
+
+test("generatedSourceBundleJsonSchema is strict-mode compliant: all properties in required", () => {
+  function checkStrictMode(schema: Record<string, unknown>, path: string) {
+    if (schema.type !== "object" || !schema.additionalProperties === false) {
+      return;
+    }
+    const properties = Object.keys((schema.properties ?? {}) as Record<string, unknown>);
+    const required = (schema.required ?? []) as string[];
+    for (const prop of properties) {
+      assert.ok(
+        required.includes(prop),
+        `Property "${prop}" at ${path} is in properties but not in required (strict-mode violation)`,
+      );
+    }
+    // Recurse into nested object schemas
+    for (const [key, value] of Object.entries((schema.properties ?? {}) as Record<string, unknown>)) {
+      const propSchema = value as Record<string, unknown>;
+      if (propSchema.type === "object") {
+        checkStrictMode(propSchema, `${path}.${key}`);
+      }
+      if (propSchema.type === "array" && propSchema.items) {
+        const items = propSchema.items as Record<string, unknown>;
+        if (items.type === "object") {
+          checkStrictMode(items, `${path}.${key}[]`);
+        }
+      }
+    }
+  }
+
+  checkStrictMode(generatedSourceBundleJsonSchema, "root");
 });

@@ -90,7 +90,7 @@ export function buildViteReactSourceBundlePrompts(brief: ProjectBrief) {
 export const generatedSourceBundleJsonSchema: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["bundleId", "targetKind", "entryModule", "files", "notes"],
+  required: ["bundleId", "targetKind", "entryModule", "files", "packageRequirements", "notes"],
   properties: {
     bundleId: { type: "string", minLength: 1 },
     targetKind: { type: "string", enum: [...projectBriefTargetKindValues] },

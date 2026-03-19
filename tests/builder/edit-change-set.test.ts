@@ -115,3 +115,45 @@ test("applyWorkspaceEditChangeSet returns deterministic updates and hashes", () 
   assert.equal(result.updates[0]?.action, "upsert");
   assert.notEqual(result.beforeHashes["src/App.tsx"], result.afterHashes["src/App.tsx"]);
 });
+
+test("deriveWorkspaceEditChangeSet records identical-content skipped files", () => {
+  const currentPlan = createPlan([
+    { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>Same</main>; }\n" },
+    { path: "src/styles.css", kind: "source", content: "body { color: black; }\n" },
+  ]);
+  const nextPlan = createPlan([
+    { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>Same</main>; }\n" },
+    { path: "src/styles.css", kind: "source", content: "body { color: black; }\n" },
+  ]);
+
+  const changeSet = deriveWorkspaceEditChangeSet(currentPlan, nextPlan, "runtime-1");
+
+  assert.equal(changeSet.operations.length, 0);
+  assert.equal(changeSet.skippedFiles.length, 2);
+  assert.deepEqual(
+    changeSet.skippedFiles.map((s) => ({ path: s.path, reason: s.reason })),
+    [
+      { path: "src/App.tsx", reason: "identical-content" },
+      { path: "src/styles.css", reason: "identical-content" },
+    ],
+  );
+  assert.match(changeSet.summary, /skipped/i);
+});
+
+test("deriveWorkspaceEditChangeSet records path-not-allowed skipped files", () => {
+  const currentPlan = createPlan([
+    { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>Old</main>; }\n" },
+    { path: "package.json", kind: "source", content: '{ "name": "app" }\n' },
+  ]);
+  const nextPlan = createPlan([
+    { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>New</main>; }\n" },
+    { path: "package.json", kind: "source", content: '{ "name": "app", "version": "2.0" }\n' },
+  ]);
+
+  const changeSet = deriveWorkspaceEditChangeSet(currentPlan, nextPlan, "runtime-1");
+
+  assert.equal(changeSet.operations.length, 1);
+  assert.equal(changeSet.operations[0].path, "src/App.tsx");
+  assert.equal(changeSet.skippedFiles.length, 1);
+  assert.deepEqual(changeSet.skippedFiles[0], { path: "package.json", reason: "path-not-allowed" });
+});

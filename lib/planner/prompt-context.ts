@@ -86,10 +86,5 @@ export function formatPromptContextForLlm(context: PromptContextEnvelope) {
 }
 
 function summarizeCurrentSpec(spec: AppSpec) {
-  const pages = spec.pages.map((page) => page.title).join(", ");
-
-  return [
-    `Title: ${spec.title}`,
-    pages ? `Pages: ${pages}` : null,
-  ].filter(Boolean).join("\n");
+  return `Title: ${spec.title}`;
 }

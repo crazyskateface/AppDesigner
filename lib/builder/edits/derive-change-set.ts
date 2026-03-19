@@ -5,6 +5,7 @@ import {
   workspaceEditChangeSetSchema,
   type WorkspaceEditChangeSet,
   type WorkspaceEditOperation,
+  type WorkspaceEditSkippedFile,
 } from "@/lib/builder/edits/schema";
 import { isAllowedGeneratedSourcePath } from "@/lib/codegen/vite-react/source-bundle-contract";
 
@@ -19,23 +20,33 @@ export function deriveWorkspaceEditChangeSet(
   runtimeId: string | null,
 ): WorkspaceEditChangeSet {
   const currentByPath = new Map(
-    currentPlan.files.filter((file) => isAllowedGeneratedSourcePath(file.path)).map((file) => [file.path, file]),
+    currentPlan.files.map((file) => [file.path, file]),
   );
   const nextByPath = new Map(
-    nextPlan.files.filter((file) => isAllowedGeneratedSourcePath(file.path)).map((file) => [file.path, file]),
+    nextPlan.files.map((file) => [file.path, file]),
   );
   const allPaths = [...new Set([...currentByPath.keys(), ...nextByPath.keys()])].sort();
 
-  const operations: WorkspaceEditOperation[] = allPaths.flatMap((path): WorkspaceEditOperation[] => {
+  const operations: WorkspaceEditOperation[] = [];
+  const skippedFiles: WorkspaceEditSkippedFile[] = [];
+
+  for (const path of allPaths) {
     const currentFile = currentByPath.get(path);
     const nextFile = nextByPath.get(path);
 
     if (!currentFile && !nextFile) {
-      return [];
+      continue;
+    }
+
+    if (!isAllowedGeneratedSourcePath(path)) {
+      if (currentFile?.content !== nextFile?.content) {
+        skippedFiles.push({ path, reason: "path-not-allowed" });
+      }
+      continue;
     }
 
     if (!currentFile && nextFile) {
-      return [{
+      operations.push({
         id: createOperationId(path),
         type: "create-file" as const,
         path,
@@ -44,11 +55,12 @@ export function deriveWorkspaceEditChangeSet(
         previousContentHash: null,
         nextContent: nextFile.content,
         reason: `Create ${path} in the live workspace.`,
-      }];
+      });
+      continue;
     }
 
     if (currentFile && !nextFile) {
-      return [{
+      operations.push({
         id: createOperationId(path),
         type: "delete-file" as const,
         path,
@@ -57,18 +69,20 @@ export function deriveWorkspaceEditChangeSet(
         previousContentHash: hashWorkspaceContent(currentFile.content),
         nextContent: null,
         reason: `Delete ${path} from the live workspace.`,
-      }];
+      });
+      continue;
     }
 
     if (!currentFile || !nextFile) {
-      return [];
+      continue;
     }
 
     if (currentFile.content === nextFile.content && currentFile.kind === nextFile.kind) {
-      return [];
+      skippedFiles.push({ path, reason: "identical-content" });
+      continue;
     }
 
-    return [{
+    operations.push({
       id: createOperationId(path),
       type: "replace-file" as const,
       path,
@@ -77,8 +91,8 @@ export function deriveWorkspaceEditChangeSet(
       previousContentHash: hashWorkspaceContent(currentFile.content),
       nextContent: nextFile.content,
       reason: `Replace ${path} in the live workspace.`,
-    }];
-  });
+    });
+  }
 
   return workspaceEditChangeSetSchema.parse({
     changeSetId: `changeset-${nextPlan.workspaceId}`,
@@ -86,9 +100,12 @@ export function deriveWorkspaceEditChangeSet(
     workspaceId: currentPlan.workspaceId,
     runtimeId,
     mode: "edit",
-    summary: `Apply ${operations.length} bounded workspace edit operations.`,
+    summary: operations.length
+      ? `Apply ${operations.length} bounded workspace edit operations.`
+      : `No file changes detected. ${skippedFiles.length} file(s) skipped: ${skippedFiles.map((s) => `${s.path} (${s.reason})`).join(", ") || "none"}.`,
     source: "plan-diff",
     repairNotes: [],
     operations,
+    skippedFiles,
   });
 }

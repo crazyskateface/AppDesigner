@@ -65,7 +65,6 @@ export function buildProjectMemoryLlmSummary(memory: ProjectBuildMemory) {
   const { projectState } = memory;
   const projectStateLines = [
     projectState.appTitle ? `Current app: ${projectState.appTitle}` : null,
-    projectState.pageTitles.length ? `Pages: ${projectState.pageTitles.join(", ")}` : null,
     projectState.runtimeStatus ? `Runtime: ${projectState.runtimeStatus}` : null,
     projectState.lastFailure ? `Last failure: ${projectState.lastFailure}` : null,
   ].filter((value): value is string => Boolean(value));
