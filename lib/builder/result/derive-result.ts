@@ -1,7 +1,9 @@
+import type { EditModeStrategy } from "@/lib/builder/edits/edit-mode-router";
 import type { AppSpec, AppSpecGenerationMeta, PageType, SectionType } from "@/lib/domain/app-spec";
 import type { RuntimeSession, RuntimeUpdateResult } from "@/lib/runtime/service/dto";
 
 import { buildGroundedAssistantSummary } from "@/lib/builder/result/assistant-summary";
+import { deriveOperationStages } from "@/lib/builder/result/operation-stages";
 import { groundedBuildResultSchema, type GroundedBuildResult } from "@/lib/builder/result/schema";
 import { derivePostApplyCodeVerification } from "@/lib/builder/verification/post-apply-code-verifier";
 
@@ -17,6 +19,7 @@ type DeriveGroundedBuildResultInput = {
   restartReason?: string | null;
   noOpReason?: string | null;
   applyErrorMessage?: string | null;
+  editStrategy?: EditModeStrategy | null;
 };
 
 const supportedSectionRequests: Array<{ type: SectionType; patterns: RegExp[] }> = [
@@ -178,13 +181,27 @@ export function deriveGroundedBuildResult(input: DeriveGroundedBuildResultInput)
     null;
   const runtimeDiagnosticSummary = input.restartedRuntimeSession?.failure?.message ?? input.updateResult?.session.failure?.message ?? null;
   const verification = input.mode === "edit" ? derivePostApplyCodeVerification(input.userPrompt, input.updateResult) : null;
+  const isDirectUiEdit = input.editStrategy === "direct-ui-source-edit";
+
+  const stages = deriveOperationStages({
+    mode: input.mode,
+    generationMeta: input.generationMeta,
+    updateResult: input.updateResult,
+    restartedRuntimeSession: input.restartedRuntimeSession,
+    noOpReason: input.noOpReason,
+    applyErrorMessage: input.applyErrorMessage,
+    verification,
+    editStrategy: input.editStrategy ?? null,
+  });
 
   let classification: GroundedBuildResult["classification"];
 
   if (input.applyErrorMessage) {
     classification = "apply_failed";
   } else if (verification?.classification === "landed") {
-    classification = "verified_success";
+    // Direct-ui-source-edits only have file-level verification — no structural
+    // AppSpec diff to confirm request fulfillment. Honest: partial_success.
+    classification = isDirectUiEdit ? "partial_success" : "verified_success";
   } else if (verification?.classification === "partial" || verification?.classification === "inconclusive") {
     classification = "partial_success";
   } else if (verification?.classification === "not_landed") {
@@ -194,7 +211,9 @@ export function deriveGroundedBuildResult(input: DeriveGroundedBuildResultInput)
   } else if (!runtimeHealthy) {
     classification = workspaceChanged || appSpecChanged ? "partial_success" : "runtime_failed";
   } else if (input.mode === "create") {
-    classification = "verified_success";
+    // Honest classification: create-mode has no file-level verification,
+    // so we report partial_success — the runtime started but content was not verified.
+    classification = "partial_success";
   } else if (verifiedRequestedChanges.length > 0 && unverifiedRequestedChanges.length === 0) {
     classification = "verified_success";
   } else if (workspaceChanged || appSpecChanged || appliedPaths.length > 0) {
@@ -245,18 +264,28 @@ export function deriveGroundedBuildResult(input: DeriveGroundedBuildResultInput)
       diagnosticSummary: runtimeDiagnosticSummary,
     },
     verification,
+    stages,
     classification,
   } as const;
 
   const assistant = buildGroundedAssistantSummary(baseResult);
-  const durableFacts = classification === "verified_success" || classification === "partial_success"
-    ? [
-        ...(verification?.verifiedLandedEdits.length
-          ? verification.verifiedLandedEdits
-          : verifiedRequestedChanges.map((item) => `Verified ${item} in ${input.nextSpec.title}.`)),
-        ...addedPageTitles.slice(0, 3).map((title) => `Verified page present: ${title}.`),
-      ]
-    : [];
+
+  // Gate durable facts on verification strength.
+  // "succeeded" = file-level verified (code verification landed).
+  // "partial" with structural spec evidence = spec-level verified (page/entity diff matched).
+  // Create-mode "partial" = runtime-only, no durable facts.
+  const hasVerifiedOutcome =
+    stages.verification.status === "succeeded" ||
+    (stages.verification.status === "partial" && verifiedRequestedChanges.length > 0);
+  const durableFacts =
+    hasVerifiedOutcome && (classification === "verified_success" || classification === "partial_success")
+      ? [
+          ...(verification?.verifiedLandedEdits.length
+            ? verification.verifiedLandedEdits
+            : verifiedRequestedChanges.map((item) => `Verified ${item} in ${input.nextSpec.title}.`)),
+          ...addedPageTitles.slice(0, 3).map((title) => `Verified page present: ${title}.`),
+        ]
+      : [];
   const outcomeSummary =
     classification === "verified_success"
       ? assistant.message
@@ -276,7 +305,7 @@ export function deriveGroundedBuildResult(input: DeriveGroundedBuildResultInput)
       durableFacts,
       updateProjectState:
         input.mode === "create"
-          ? classification === "verified_success"
+          ? classification === "partial_success" || classification === "verified_success"
           : verification
             ? verification.classification === "landed"
             : classification === "verified_success" || classification === "partial_success",

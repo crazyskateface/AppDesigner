@@ -16,4 +16,8 @@ function getOrCreateRuntimeService() {
   return next;
 }
 
-export const runtimeService = getOrCreateRuntimeService();
+export function getRuntimeService() {
+  return getOrCreateRuntimeService();
+}
+
+export const runtimeService = getRuntimeService();

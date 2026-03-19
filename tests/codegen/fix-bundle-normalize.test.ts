@@ -19,9 +19,9 @@ function createDiagnostic(): DiagnosticArtifact {
       code: "client_runtime_failed",
       message: "Missing named export",
     },
-    logExcerpt: "browser: SyntaxError: The requested module '/src/project-brief.ts' does not provide an export named 'projectBrief'",
+    logExcerpt: "browser: SyntaxError: The requested module '/src/app-meta.ts' does not provide an export named 'appMeta'",
     stackExcerpt: "at App (App.tsx:2:10)",
-    allowedFiles: ["src/App.tsx", "src/project-brief.ts", "src/styles.css"],
+    allowedFiles: ["src/App.tsx", "src/app-meta.ts", "src/styles.css"],
     currentFiles: [],
     projectBrief,
     generatedFileMetadata: {
@@ -37,15 +37,15 @@ function createDiagnostic(): DiagnosticArtifact {
   };
 }
 
-test("fix bundle normalization repairs src/project-brief.ts back to the canonical named export", () => {
+test("fix bundle normalization repairs src/app-meta.ts back to the canonical named export", () => {
   const result = normalizeGeneratedFixBundleCandidate(
     {
       fixId: "fix-1",
       diagnosticId: "diagnostic-1",
-      reasoningSummary: "Rewrite the project brief module.",
+      reasoningSummary: "Rewrite the app meta module.",
       files: [
         {
-          path: "src/project-brief.ts",
+          path: "src/app-meta.ts",
           kind: "source",
           content: "export default {};",
         },
@@ -55,6 +55,6 @@ test("fix bundle normalization repairs src/project-brief.ts back to the canonica
   );
 
   assert.equal(result.files?.length, 1);
-  assert.match(result.files?.[0]?.content ?? "", /export const projectBrief =/);
+  assert.match(result.files?.[0]?.content ?? "", /export const appMeta =/);
   assert.doesNotMatch(result.files?.[0]?.content ?? "", /export default/);
 });

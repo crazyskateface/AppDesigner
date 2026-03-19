@@ -1,6 +1,16 @@
 import { projectBriefTargetKindValues, type ProjectBrief } from "@/lib/planner/project-brief";
 
-export const viteReactGeneratedSourceRequiredPaths = ["src/project-brief.ts", "src/App.tsx", "src/styles.css"] as const;
+export const viteReactGeneratedSourceRequiredPaths = ["src/app-meta.ts", "src/App.tsx", "src/styles.css"] as const;
+
+export function isAllowedDirectSourceEditPath(path: string) {
+  return (
+    path === "src/App.tsx" ||
+    path === "src/styles.css" ||
+    path === "src/app-meta.ts" ||
+    /^src\/components\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path) ||
+    /^src\/pages\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path)
+  );
+}
 
 export function isAllowedGeneratedSourcePath(path: string) {
   return (
@@ -20,7 +30,7 @@ export function buildViteReactSourceBundlePrompts(brief: ProjectBrief) {
     "entryModule must be src/App.tsx.",
     "Only output source files. Do not output config or asset files.",
     "Allowed file paths:",
-    "- src/project-brief.ts",
+    "- src/app-meta.ts",
     "- src/App.tsx",
     "- src/styles.css",
     "- src/components/*.ts",
@@ -30,34 +40,47 @@ export function buildViteReactSourceBundlePrompts(brief: ProjectBrief) {
     "- src/routes/**/*.ts",
     "- src/routes/**/*.tsx",
     "- src/lib/**/*.ts",
-    "Required files: src/project-brief.ts, src/App.tsx, src/styles.css.",
+    "Required files: src/app-meta.ts, src/App.tsx, src/styles.css.",
     "The deterministic scaffold already provides src/main.tsx, package.json, Vite config, tsconfig, and Docker plumbing.",
     'src/main.tsx already imports a default export from "./App" and imports "./styles.css".',
-    "The ProjectBrief shape is: title, summary, prompt, navigation[], pages[].",
-    "Each page has: id, title, pageType, summary, sectionTitles[].",
-    "There is no top-level projectBrief.sections field.",
-    "Read section labels from projectBrief.pages[n].sectionTitles.",
+    "",
+    "## Source-first generation rules",
+    "",
+    "Generate a normal small React app with explicit page components under src/pages/.",
+    "Each page must be an independent .tsx file with self-contained JSX and baked-in content.",
+    "Do NOT import or iterate over any serialized data model, config array, or spec object at runtime.",
+    "Do NOT import projectBrief, appSpec, or any similar structured data blob.",
+    "Bake all page structure, section titles, and placeholder content directly into JSX as literal strings.",
+    "Small duplication across page components is acceptable and preferred over shared data abstractions.",
+    "",
+    "src/app-meta.ts must export a named constant `appMeta` with exactly three fields:",
+    '  { name: string, tagline: string, createdFrom: string }',
+    "appMeta is provenance metadata only — it may be used for a header title or footer, never to drive page structure.",
+    "",
+    "The generated app should look like a small hand-written React app.",
+    "A follow-up LLM edit should be able to modify any page by editing its .tsx file directly, without regenerating any spec or data model.",
+    "",
     "Keep this as a static TypeScript React app.",
     "Do not add API calls, servers, databases, or authentication.",
     'You may import from React, local app files, and approved npm packages that you explicitly declare in packageRequirements.',
     "Use packageRequirements only when the app genuinely benefits from an external React-friendly package.",
     "Prefer a small set of package requirements and keep the app bootable without custom build tooling.",
-    "Code must not assume undocumented fields exist on projectBrief.",
-    "Make the app feel product-like and specific to the ProjectBrief, not generic placeholder UI.",
+    "Make the app feel product-like and specific to the project description, not generic placeholder UI.",
     "The app structure may include routes, pages, nested components, and app-specific lib helpers if useful.",
   ].join("\n");
 
   return {
     systemPrompt: [
       "You generate app-specific source files for a local-first AI coding orchestrator.",
-      "Your job is to turn a ProjectBrief into a bounded source bundle for a Vite + React workspace.",
+      "Your job is to turn a project description into a bounded source bundle for a Vite + React workspace.",
+      "The project description below is generation context only — do not serialize or import it in the generated code.",
       contract,
     ].join("\n\n"),
     userPrompt: [
-      "ProjectBrief JSON:",
+      "Project description (generation context only — do not serialize into source):",
       JSON.stringify(brief, null, 2),
       "",
-      "Generate the best matching source bundle for this project brief.",
+      "Generate the best matching source bundle as a normal, readable React app.",
     ].join("\n"),
   };
 }
@@ -94,7 +117,7 @@ export const generatedSourceBundleJsonSchema: Record<string, unknown> = {
         required: ["name", "section"],
         properties: {
           name: { type: "string", minLength: 1 },
-          version: { type: "string", minLength: 1 },
+          version: { type: ["string", "null"], minLength: 1 },
           section: { type: "string", enum: ["dependencies", "devDependencies"] },
         },
       },

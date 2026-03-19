@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { operationStagesSchema } from "@/lib/builder/result/operation-stages";
 import { postApplyCodeVerificationSchema } from "@/lib/builder/verification/schema";
 import { appSpecGenerationMetaSchema, appSpecSchema, builderModeSchema, pageTypeSchema, sectionTypeSchema } from "@/lib/domain/app-spec";
 
@@ -60,6 +61,7 @@ export const groundedBuildResultSchema = z.object({
     diagnosticSummary: z.string().min(1).nullable().default(null),
   }),
   verification: postApplyCodeVerificationSchema.nullable().default(null),
+  stages: operationStagesSchema,
   classification: groundedBuildResultClassificationSchema,
   assistant: z.object({
     tone: groundedBuildResultAssistantToneSchema,

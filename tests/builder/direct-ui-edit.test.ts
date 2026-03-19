@@ -12,6 +12,12 @@ test("resolveEditModeStrategy routes common UI prompts to direct source edit", (
     "direct-ui-source-edit",
   );
   assert.equal(resolveEditModeStrategy("Add an embed section with a product demo video."), "direct-ui-source-edit");
+  assert.equal(resolveEditModeStrategy("Reorder the sections and update the hero copy."), "direct-ui-source-edit");
+});
+
+test("resolveEditModeStrategy keeps schema-oriented page/entity edits on the AppSpec path", () => {
+  assert.equal(resolveEditModeStrategy("Add a settings page with a form."), "app-spec-edit");
+  assert.equal(resolveEditModeStrategy("Add an entity for customer accounts and update the navigation."), "app-spec-edit");
 });
 
 test("direct UI edit contract accepts bounded testimonials component updates", () => {
@@ -33,6 +39,24 @@ test("direct UI edit contract accepts bounded testimonials component updates", (
   });
 
   assert.equal(result.files.length, 2);
+});
+
+test("direct UI edit contract rejects out-of-bounds files", () => {
+  assert.throws(
+    () =>
+      directUiEditResultSchema.parse({
+        summary: "Attempt an out-of-bounds edit.",
+        files: [
+          {
+            path: "src/lib/unsafe.ts",
+            kind: "source",
+            content: "export const unsafe = true;\n",
+          },
+        ],
+        notes: [],
+      }),
+    /outside the allowed direct UI edit surface/i,
+  );
 });
 
 test("edit no-op message no longer hardcodes testimonials-style content as unsupported structure", () => {

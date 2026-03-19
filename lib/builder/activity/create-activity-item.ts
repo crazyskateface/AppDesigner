@@ -5,6 +5,7 @@ import type {
   BuilderActivityKind,
   BuilderActivityRole,
   BuilderActivitySource,
+  BuilderActivityStagesSummary,
   BuilderActivityTone,
 } from "@/lib/builder/activity/model";
 
@@ -20,6 +21,7 @@ export function createBuilderActivityItem(input: {
   timestamp?: string;
   questions?: ClarificationQuestion[];
   answers?: ClarificationAnswer[];
+  stagesSummary?: BuilderActivityStagesSummary;
 }): BuilderActivityItem {
   return {
     id: createActivityId(),
@@ -34,6 +36,7 @@ export function createBuilderActivityItem(input: {
     dedupeKey: input.dedupeKey,
     questions: input.questions,
     answers: input.answers,
+    stagesSummary: input.stagesSummary,
   };
 }
 
@@ -70,6 +73,7 @@ export function createAssistantActivity(input: {
   timestamp?: string;
   questions?: ClarificationQuestion[];
   answers?: ClarificationAnswer[];
+  stagesSummary?: BuilderActivityStagesSummary;
 }) {
   return createBuilderActivityItem({
     role: "assistant",

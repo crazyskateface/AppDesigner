@@ -1,5 +1,6 @@
 import { createAssistantActivity, createUserClarificationAnswersActivity } from "@/lib/builder/activity/create-activity-item";
-import type { BuilderActivityItem } from "@/lib/builder/activity/model";
+import type { BuilderActivityItem, BuilderActivityStagesSummary } from "@/lib/builder/activity/model";
+import type { GroundedBuildResult } from "@/lib/builder/result/schema";
 import type { ClarificationQuestion } from "@/lib/planner/clarification/types";
 import type { ClarificationAnswer } from "@/lib/planner/prompt-context";
 import type { BrowserRuntimeErrorReport, RuntimeRepairAttempt, RuntimeSession } from "@/lib/runtime/service/dto";
@@ -280,4 +281,21 @@ function toRepairTitle(attempt: RuntimeRepairAttempt) {
     default:
       return "Auto-fix attempt failed.";
   }
+}
+
+export function createGroundedResultActivity(result: GroundedBuildResult): BuilderActivityItem {
+  const stagesSummary: BuilderActivityStagesSummary = {
+    generation: result.stages.generation.status,
+    apply: result.stages.apply.status,
+    runtime: result.stages.runtime.status,
+    verification: result.stages.verification.status,
+  };
+
+  return createAssistantActivity({
+    kind: "assistant-response",
+    tone: result.assistant.tone,
+    title: result.assistant.message,
+    source: "builder",
+    stagesSummary,
+  });
 }

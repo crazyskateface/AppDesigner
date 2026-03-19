@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isAllowedGeneratedSourcePath } from "@/lib/codegen/vite-react/source-bundle-contract";
+import { isAllowedDirectSourceEditPath } from "@/lib/codegen/vite-react/source-bundle-contract";
 import type { WorkspaceFile } from "@/lib/workspace/model";
 
 const directUiEditFileSchema = z.object({
@@ -19,7 +19,7 @@ export const directUiEditResultSchema = z
     const seen = new Set<string>();
 
     for (const [index, file] of value.files.entries()) {
-      if (!isAllowedGeneratedSourcePath(file.path)) {
+      if (!isAllowedDirectSourceEditPath(file.path)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: `File path "${file.path}" is outside the allowed direct UI edit surface.`,
@@ -51,7 +51,7 @@ export function buildDirectUiEditPrompts(input: {
       "This is a direct UI/source edit path for common UI requests.",
       "Normal requests like testimonials, quote blocks, promo sections, embeds, and content/layout additions are supported and should be attempted.",
       "Update only the minimum app-owned source files needed.",
-      "Allowed file paths are bounded to src/App.tsx, src/styles.css, src/components/**, src/pages/**, src/routes/**, and src/lib/**.",
+      "Allowed file paths are bounded to src/App.tsx, src/styles.css, src/components/**, and src/pages/**.",
       "Do not output config files, runtime files, Docker files, or prose.",
       "Return full updated file contents for changed files only.",
       "Do not claim the edit is already complete or user-visible in the summary; describe only the attempted file change.",

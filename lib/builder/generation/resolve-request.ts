@@ -5,7 +5,7 @@ import { generateBuilderAssistantReply } from "@/lib/builder/chat/assistant-repl
 import type { StructuredObjectGenerator } from "@/lib/llm/types";
 import { decideClarificationForPromptContext } from "@/lib/planner/clarification/decision";
 import { buildPromptContextEnvelope } from "@/lib/planner/prompt-context";
-import { runtimeService } from "@/lib/runtime/service";
+import { getRuntimeService } from "@/lib/runtime/service";
 import { generateAppSpecFromPrompt } from "@/lib/spec-pipeline/app-spec-generation-orchestrator";
 
 import type { BuilderGenerateRequest, BuilderGenerateResponse } from "@/lib/builder/generation/contract";
@@ -65,7 +65,7 @@ export async function resolveBuilderGenerateRequest(
     const editStrategy = resolveEditModeStrategy(input.prompt);
 
     if (editStrategy === "direct-ui-source-edit") {
-      const workspaceContext = runtimeService.getRuntimeWorkspaceFiles(input.runtimeId);
+      const workspaceContext = getRuntimeService().getRuntimeWorkspaceFiles(input.runtimeId);
       const currentFiles = workspaceContext.files.filter((file) => file.kind === "source");
       const directEdit = await generateDirectUiEdit(
         {

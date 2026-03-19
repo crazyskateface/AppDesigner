@@ -36,9 +36,7 @@ export function buildGroundedAssistantSummary(result: Omit<GroundedBuildResult, 
       const verifiedSummary =
         verified.length > 0
           ? `I applied and verified ${joinQuoted(verified)} in ${title}.`
-          : result.mode === "create"
-            ? `I created ${title} and verified the generated app shell is in place.`
-            : `I applied and verified the structural update in ${title}.`;
+          : `I applied and verified the structural update in ${title}.`;
 
       return {
         tone: "success" as const,
@@ -57,6 +55,23 @@ export function buildGroundedAssistantSummary(result: Omit<GroundedBuildResult, 
         return {
           tone: "warning" as const,
           message: `${verification.summary}${missingSummary}${strategyNote}`.trim(),
+        };
+      }
+
+      // Direct-ui-source-edit: files landed but visual fulfillment not confirmed.
+      if (verification?.classification === "landed") {
+        const pathCount = verification.verifiedLandedEdits.length;
+        return {
+          tone: "success" as const,
+          message: `I applied the source ${pathCount === 1 ? "change" : "changes"} and the ${pathCount === 1 ? "file" : "files"} landed in the workspace.${strategyNote} I have not verified that the visual result matches your request.`,
+        };
+      }
+
+      // Create-mode honest partial success: runtime started but no file-level verification.
+      if (result.mode === "create" && result.runtime.healthy && result.stages.verification.status === "partial") {
+        return {
+          tone: "success" as const,
+          message: `I created ${title} and the runtime started successfully.`,
         };
       }
 

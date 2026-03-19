@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { createProjectBriefModuleFile } from "@/lib/codegen/vite-react/project-brief-module";
+import { createAppMetaModuleFile } from "@/lib/codegen/vite-react/app-meta-module";
 import { isAllowedGeneratedSourcePath } from "@/lib/codegen/vite-react/source-bundle-contract";
 import { generatedFixBundleSchema, type GeneratedFixBundle } from "@/lib/codegen/fixes/fix-bundle-model";
 import type { DiagnosticArtifact } from "@/lib/runtime/diagnostics/diagnostic-artifact";
@@ -58,8 +58,8 @@ export function normalizeGeneratedFixBundleCandidate(candidate: unknown, diagnos
 
   const byPath = new Map(files.map((file) => [file.path, file]));
 
-  if (byPath.has("src/project-brief.ts")) {
-    byPath.set("src/project-brief.ts", createProjectBriefModuleFile(diagnostic.projectBrief));
+  if (byPath.has("src/app-meta.ts")) {
+    byPath.set("src/app-meta.ts", createAppMetaModuleFile(diagnostic.projectBrief));
   }
 
   const dedupedFiles = Array.from(byPath.values());

@@ -118,3 +118,114 @@ test("builder generation request proceeds after one answered clarification batch
   assert.equal(response.status, "generation_ready");
   assert.equal(response.appSpec.title, appSpec.title);
 });
+
+test("builder generation request uses direct source edit mode for common UI edit prompts", async () => {
+  const currentSpec = generateFallbackAppSpec("Build a landing page for a furniture brand.");
+
+  globalThis.__appDesignerRuntimeService__ = {
+    getRuntimeWorkspaceFiles() {
+      return {
+        runtimeId: "runtime-1",
+        workspaceId: "workspace-1",
+        files: [
+          {
+            path: "src/App.tsx",
+            kind: "source",
+            content: "export default function App() { return <main>Furniture Punks</main>; }\n",
+          },
+          {
+            path: "src/styles.css",
+            kind: "source",
+            content: "body { font-family: sans-serif; }\n",
+          },
+        ],
+      };
+    },
+  } as never;
+
+  const response = await resolveBuilderGenerateRequest(
+    {
+      prompt: "Add a testimonials section with happy customer quotes to the landing page.",
+      mode: "edit",
+      currentSpec,
+      runtimeId: "runtime-1",
+      clarificationAnswers: [],
+    },
+    {
+      provider: new StubProvider({
+        clarification_decision: {
+          decision: "build-now",
+          summary: "Ready to edit.",
+          questions: [],
+        },
+        direct_ui_edit: {
+          summary: "Update the landing page source with a testimonials section.",
+          files: [
+            {
+              path: "src/App.tsx",
+              kind: "source",
+              content: "export default function App() { return <main><section>Testimonials</section></main>; }\n",
+            },
+          ],
+          notes: [],
+        },
+      }),
+    },
+  );
+
+  assert.equal(response.status, "generation_ready");
+  assert.equal(response.appSpec.title, currentSpec.title);
+  assert.equal(response.directEdit?.strategy, "direct-ui-source-edit");
+  assert.match(response.assistantMessage, /prepared a direct source edit/i);
+});
+
+test("builder generation request falls back to AppSpec edit mode for schema-oriented page changes", async () => {
+  const currentSpec = generateFallbackAppSpec("Build a CRM for a solo consultant.");
+  const nextSpec = {
+    ...currentSpec,
+    pages: [
+      ...currentSpec.pages,
+      {
+        id: "settings",
+        title: "Settings",
+        pageType: "settings" as const,
+        pageLayout: "stack" as const,
+        entityIds: [],
+        sections: [
+          {
+            id: "settings-form",
+            type: "form" as const,
+            title: "Settings",
+            placement: "main" as const,
+            emphasis: "default" as const,
+          },
+        ],
+      },
+    ],
+    navigation: [...currentSpec.navigation, { id: "settings-nav", label: "Settings", pageId: "settings" }],
+  };
+
+  const response = await resolveBuilderGenerateRequest(
+    {
+      prompt: "Add a settings page with a form.",
+      mode: "edit",
+      currentSpec,
+      runtimeId: "runtime-1",
+      clarificationAnswers: [],
+    },
+    {
+      provider: new StubProvider({
+        clarification_decision: {
+          decision: "build-now",
+          summary: "Ready to edit.",
+          questions: [],
+        },
+        app_spec: nextSpec,
+      }),
+    },
+  );
+
+  assert.equal(response.status, "generation_ready");
+  assert.equal(response.directEdit, undefined);
+  assert.equal(response.appSpec.pages.length, currentSpec.pages.length + 1);
+});

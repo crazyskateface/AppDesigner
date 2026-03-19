@@ -18,9 +18,9 @@ class StubProvider implements StructuredObjectGenerator {
         entryModule: "src/App.tsx",
         files: [
           {
-            path: "src/project-brief.ts",
+            path: "src/app-meta.ts",
             kind: "source",
-            content: "export const projectBrief = { title: 'Inventory Hub' };",
+            content: "export const appMeta = { name: 'Inventory Hub', tagline: '', createdFrom: '' };",
           },
           {
             path: "src/App.tsx",

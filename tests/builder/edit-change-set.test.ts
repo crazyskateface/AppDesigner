@@ -31,12 +31,12 @@ test("deriveWorkspaceEditChangeSet emits explicit create and replace operations"
   const currentPlan = createPlan([
     { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>Old</main>; }\n" },
     { path: "src/styles.css", kind: "source", content: "body { color: black; }\n" },
-    { path: "src/project-brief.ts", kind: "source", content: "export const projectBrief = {};\n" },
+    { path: "src/app-meta.ts", kind: "source", content: "export const appMeta = { name: 'Test', tagline: '', createdFrom: '' };\n" },
   ]);
   const nextPlan = createPlan([
     { path: "src/App.tsx", kind: "source", content: "export default function App() { return <main>New</main>; }\n" },
     { path: "src/styles.css", kind: "source", content: "body { color: black; }\n" },
-    { path: "src/project-brief.ts", kind: "source", content: "export const projectBrief = {};\n" },
+    { path: "src/app-meta.ts", kind: "source", content: "export const appMeta = { name: 'Test', tagline: '', createdFrom: '' };\n" },
     { path: "src/components/ExtraPanel.tsx", kind: "source", content: "export function ExtraPanel() { return <section>Extra</section>; }\n" },
   ]);
 

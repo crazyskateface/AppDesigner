@@ -12,9 +12,8 @@ export function buildFixBundlePrompts(diagnostic: DiagnosticArtifact) {
     "Each file replacement must contain the full file content.",
     "Do not add network calls, servers, auth, databases, or new dependencies.",
     "Use only React and the existing app-owned local imports.",
-    "Respect the ProjectBrief shape: title, summary, prompt, navigation[], pages[], pages[].sectionTitles[].",
-    "There is no projectBrief.sections field.",
-    'If you modify "src/project-brief.ts", it must export a named `projectBrief` constant.',
+    "The app uses src/app-meta.ts for metadata only (name, tagline, createdFrom). It does not import or depend on any ProjectBrief or AppSpec data model.",
+    'If you modify "src/app-meta.ts", it must export a named `appMeta` constant with name, tagline, and createdFrom fields.',
   ].join("\n");
 
   return {

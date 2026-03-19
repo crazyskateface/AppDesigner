@@ -20,7 +20,7 @@ class StubProvider implements StructuredObjectGenerator {
           {
             path: ".\\src\\App.tsx",
             kind: "source",
-            content: 'import { CreatorCard } from "./components/CreatorCard";\n\nexport default function App() { return <CreatorCard />; }',
+            content: 'import CreatorCard from "./components/CreatorCard";\n\nexport default function App() { return <CreatorCard />; }',
           },
           {
             path: "src/styles.css",
@@ -30,7 +30,7 @@ class StubProvider implements StructuredObjectGenerator {
           {
             path: "src/components/CreatorCard.tsx",
             kind: "source",
-            content: 'export function CreatorCard() { return <div className="creator-card">Creator dashboard</div>; }',
+            content: 'export default function CreatorCard() { return <div className="creator-card">Creator dashboard</div>; }',
           },
         ],
         notes: ["Generated bundle"],
@@ -60,8 +60,15 @@ test("vite scaffold files stay separate from app-specific files", () => {
   assert.match(dockerfile?.content ?? "", /container-entrypoint\.sh/);
 
   assert.ok(appFiles.some((file) => file.path === "src/App.tsx"));
-  assert.ok(appFiles.some((file) => file.path === "src/project-brief.ts"));
+  assert.ok(appFiles.some((file) => file.path === "src/app-meta.ts"));
+  assert.ok(!appFiles.some((file) => file.path === "src/project-brief.ts"));
   assert.ok(!appFiles.some((file) => file.path === "package.json"));
+
+  // Verify no generated file imports projectBrief or appSpec
+  for (const file of appFiles) {
+    assert.doesNotMatch(file.content, /projectBrief\./);
+    assert.doesNotMatch(file.content, /appSpec\./);
+  }
 });
 
 test("from-project-brief composes scaffold and LLM-generated app-specific files into one file set", async () => {
@@ -75,8 +82,9 @@ test("from-project-brief composes scaffold and LLM-generated app-specific files 
   assert.ok(fileSet.files.some((file) => file.path === "package.json"));
   assert.ok(fileSet.files.some((file) => file.path === "src/main.tsx"));
   assert.ok(fileSet.files.some((file) => file.path === "src/App.tsx"));
-  assert.ok(fileSet.files.some((file) => file.path === "src/project-brief.ts"));
+  assert.ok(fileSet.files.some((file) => file.path === "src/app-meta.ts"));
   assert.ok(fileSet.files.some((file) => file.path === "src/components/CreatorCard.tsx"));
+  assert.ok(!fileSet.files.some((file) => file.path === "src/project-brief.ts"));
   assert.equal(fileSet.metadata.generation.appFiles, "llm");
   assert.equal(fileSet.metadata.generation.provider?.name, "stub");
 });

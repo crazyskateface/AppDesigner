@@ -180,3 +180,218 @@ test("grounded build result prefers landed file verification for code-edit repor
   assert.match(result.assistant.message, /landed file change/i);
   assert.equal(result.memory.updateProjectState, true);
 });
+
+test("grounded build result classifies create-mode as partial_success with runtime-only verification", () => {
+  const result = deriveGroundedBuildResult({
+    projectId: "project-1",
+    mode: "create",
+    userPrompt: "Build a CRM for a solo consultant.",
+    generationMeta,
+    nextSpec: baseSpec,
+    restartedRuntimeSession: {
+      runtimeId: "runtime-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sourceSpecId: baseSpec.appId,
+      status: "running",
+      previewUrl: "http://localhost:3000",
+      createdAt: "2026-03-19T00:00:00.000Z",
+      updatedAt: "2026-03-19T00:00:30.000Z",
+    },
+  });
+
+  assert.equal(result.classification, "partial_success");
+  assert.equal(result.stages.verification.status, "partial");
+  assert.ok(result.stages.verification.evidence.length > 0);
+  assert.match(result.stages.verification.evidence[0], /runtime container started/i);
+  assert.equal(result.assistant.tone, "success");
+  assert.match(result.assistant.message, /created/i);
+  assert.doesNotMatch(result.assistant.message, /verified/i);
+  // Project state should still update for successful creates
+  assert.equal(result.memory.updateProjectState, true);
+  // But no optimistic durable facts should be stored
+  assert.equal(result.memory.durableFacts.length, 0);
+});
+
+test("grounded build result exposes explicit stage statuses for a successful edit", () => {
+  const nextSpec: AppSpec = {
+    ...baseSpec,
+    navigation: [...baseSpec.navigation, { id: "settings-nav", label: "Settings", pageId: "settings" }],
+    pages: [
+      ...baseSpec.pages,
+      {
+        id: "settings",
+        title: "Settings",
+        pageType: "settings",
+        pageLayout: "stack",
+        entityIds: [],
+        sections: [
+          {
+            id: "settings-form",
+            type: "form",
+            title: "Settings",
+            placement: "main",
+            emphasis: "default",
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = deriveGroundedBuildResult({
+    projectId: "project-1",
+    mode: "edit",
+    userPrompt: "Add a settings page with a form.",
+    generationMeta,
+    previousSpec: baseSpec,
+    nextSpec,
+    updateResult: {
+      session: {
+        runtimeId: "runtime-1",
+        projectId: "project-1",
+        workspaceId: "workspace-1",
+        sourceSpecId: nextSpec.appId,
+        status: "running",
+        createdAt: "2026-03-19T00:00:00.000Z",
+        updatedAt: "2026-03-19T00:00:30.000Z",
+      },
+      strategyUsed: "hot-update",
+      devServerRestarted: false,
+      fullRuntimeRestartRequired: false,
+      workspaceChangesApplied: true,
+      attemptedPaths: ["src/App.tsx"],
+      appliedPaths: ["src/App.tsx"],
+      updatedPaths: ["src/App.tsx"],
+    },
+  });
+
+  assert.equal(result.stages.generation.status, "succeeded");
+  assert.equal(result.stages.apply.status, "succeeded");
+  assert.equal(result.stages.runtime.status, "succeeded");
+  // Verification is partial because there's no code-level diff verification, only structural matching
+  assert.ok(result.stages.verification.status === "partial" || result.stages.verification.status === "succeeded");
+});
+
+test("grounded build result classifies create-mode runtime failure with failed stages", () => {
+  const result = deriveGroundedBuildResult({
+    projectId: "project-1",
+    mode: "create",
+    userPrompt: "Build a CRM for a solo consultant.",
+    generationMeta,
+    nextSpec: baseSpec,
+    restartedRuntimeSession: {
+      runtimeId: "runtime-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sourceSpecId: baseSpec.appId,
+      status: "failed",
+      createdAt: "2026-03-19T00:00:00.000Z",
+      updatedAt: "2026-03-19T00:00:30.000Z",
+      failure: { code: "container_start_failed", message: "Container exited with code 1." },
+    },
+  });
+
+  assert.equal(result.stages.generation.status, "succeeded");
+  assert.equal(result.stages.runtime.status, "failed");
+  assert.equal(result.stages.verification.status, "failed");
+  assert.equal(result.stages.verification.evidence.length, 0);
+  assert.equal(result.classification, "partial_success");
+});
+
+// --- Direct-UI-Source-Edit honesty tests ---
+
+const directUiEditLandedInput = () => ({
+  projectId: "project-1",
+  mode: "edit" as const,
+  userPrompt: "Replace the dashboard with a landing page hero section.",
+  generationMeta,
+  previousSpec: baseSpec,
+  nextSpec: baseSpec, // AppSpec unchanged for direct-ui-source-edits
+  editStrategy: "direct-ui-source-edit" as const,
+  updateResult: {
+    session: {
+      runtimeId: "runtime-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sourceSpecId: baseSpec.appId,
+      status: "running" as const,
+      createdAt: "2026-03-19T00:00:00.000Z",
+      updatedAt: "2026-03-19T00:00:30.000Z",
+    },
+    strategyUsed: "hot-update" as const,
+    devServerRestarted: false,
+    fullRuntimeRestartRequired: false,
+    workspaceChangesApplied: true,
+    attemptedPaths: ["src/App.tsx"],
+    appliedPaths: ["src/App.tsx"],
+    updatedPaths: ["src/App.tsx"],
+    codeVerification: {
+      generatedPaths: ["src/App.tsx"],
+      generatedFileDiffs: [
+        {
+          path: "src/App.tsx",
+          changeType: "update" as const,
+          beforeContent: "// old dashboard code",
+          generatedContent: "// new landing page hero",
+          finalContent: "// new landing page hero",
+          landingStatus: "landed" as const,
+        },
+      ],
+      finalPathsChecked: ["src/App.tsx"],
+      observedDiffs: [
+        {
+          path: "src/App.tsx",
+          changeType: "update" as const,
+          beforeContent: "// old dashboard code",
+          generatedContent: "// new landing page hero",
+          finalContent: "// new landing page hero",
+          landingStatus: "landed" as const,
+        },
+      ],
+      landedPaths: ["src/App.tsx"],
+      missingPaths: [],
+      overwrittenPaths: [],
+      unchangedPaths: [],
+    },
+  },
+});
+
+test("direct-ui-source-edit with landed verification classifies as partial_success", () => {
+  const result = deriveGroundedBuildResult(directUiEditLandedInput());
+  assert.equal(result.classification, "partial_success");
+});
+
+test("direct-ui-source-edit with landed verification produces no durable facts", () => {
+  const result = deriveGroundedBuildResult(directUiEditLandedInput());
+  assert.equal(result.memory.durableFacts.length, 0);
+});
+
+test("direct-ui-source-edit verification stage is partial when files landed", () => {
+  const result = deriveGroundedBuildResult(directUiEditLandedInput());
+  assert.equal(result.stages.verification.status, "partial");
+  assert.ok(result.stages.verification.evidence.length > 0);
+  // Evidence should describe file application, not verification
+  assert.ok(
+    result.stages.verification.evidence.some((e: string) => e.includes("Applied")),
+    "evidence should use 'Applied' instead of 'Verified landed'",
+  );
+});
+
+test("direct-ui-source-edit assistant summary does not claim verified success", () => {
+  const result = deriveGroundedBuildResult(directUiEditLandedInput());
+  // Should NOT claim the edit was "verified" as a success claim
+  assert.doesNotMatch(result.assistant.message, /\bverified\b(?! the visual| that the visual)/i);
+  // Should explicitly say visual result has NOT been verified
+  assert.ok(
+    result.assistant.message.includes("not verified") || result.assistant.message.includes("have not verified"),
+    "assistant should be explicit about unverified visual result",
+  );
+});
+
+test("app-spec-edit with landed verification still classifies as verified_success", () => {
+  const result = deriveGroundedBuildResult({
+    ...directUiEditLandedInput(),
+    editStrategy: "app-spec-edit",
+  });
+  assert.equal(result.classification, "verified_success");
+});

@@ -1,123 +1,112 @@
-import type { AppSpec } from "@/lib/domain/app-spec";
+import type { AppSpec, AppSpecPage } from "@/lib/domain/app-spec";
 
-function createSpecModule(spec: AppSpec) {
-  const serializableSpec = {
-    title: spec.title,
-    archetype: spec.archetype,
-    prompt: spec.prompt,
-    navigation: spec.navigation,
-    pages: spec.pages,
-    entities: spec.entities,
-  };
-
-  return `export const appSpec = ${JSON.stringify(serializableSpec, null, 2)} as const;\n`;
+function toComponentName(title: string): string {
+  return (
+    title
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("") + "Page"
+  );
 }
 
-function createMainTsx() {
-  return `import React from "react";
-import ReactDOM from "react-dom/client";
+function toPageKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-import App from "./App";
-import "./styles.css";
+function createAppMetaModule(spec: AppSpec) {
+  const meta = {
+    name: spec.title,
+    tagline: `${spec.archetype.charAt(0).toUpperCase() + spec.archetype.slice(1)} workspace for ${spec.title}.`,
+    createdFrom: spec.prompt,
+  };
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+  return `export const appMeta = ${JSON.stringify(meta, null, 2)} as const;\n`;
+}
+
+function createPageComponent(page: AppSpecPage): string {
+  const componentName = toComponentName(page.title);
+  const sectionCards = page.sections
+    .map(
+      (section) =>
+        `        <div className="card">
+          <h3>${section.title}</h3>
+          <p>${section.type} section — ${section.placement} placement.</p>
+        </div>`,
+    )
+    .join("\n");
+
+  return `export default function ${componentName}() {
+  return (
+    <div className="page">
+      <h2>${page.title}</h2>
+      <div className="section-grid">
+${sectionCards}
+      </div>
+    </div>
+  );
+}
 `;
 }
 
-function createAppTsx() {
-  return `import { useMemo, useState } from "react";
+function createAppTsx(spec: AppSpec) {
+  const pageEntries = spec.pages.map((page) => ({
+    key: toPageKey(page.title),
+    componentName: toComponentName(page.title),
+    label: page.title,
+  }));
 
-import { appSpec } from "./spec";
+  const imports = pageEntries
+    .map((entry) => `import ${entry.componentName} from "./pages/${entry.componentName}";`)
+    .join("\n");
 
-function summarizeEntity(entityId?: string) {
-  if (!entityId) {
-    return [];
-  }
+  const pagesMap = pageEntries
+    .map((entry) => `  "${entry.key}": ${entry.componentName},`)
+    .join("\n");
 
-  const entity = appSpec.entities.find((item) => item.id === entityId);
+  const navButtons = pageEntries
+    .map(
+      (entry) =>
+        `          <button
+            className={activePage === "${entry.key}" ? "nav-item nav-item--active" : "nav-item"}
+            onClick={() => setActivePage("${entry.key}")}
+            type="button"
+          >
+            ${entry.label}
+          </button>`,
+    )
+    .join("\n");
 
-  if (!entity) {
-    return [];
-  }
+  const defaultKey = pageEntries[0]?.key ?? "dashboard";
 
-  return entity.fields.slice(0, 4).map((field) => field.label);
-}
+  return `import { useState } from "react";
+import { appMeta } from "./app-meta";
+${imports}
+
+const pages: Record<string, React.ComponentType> = {
+${pagesMap}
+};
 
 export default function App() {
-  const [activePageId, setActivePageId] = useState(appSpec.navigation[0]?.pageId ?? appSpec.pages[0]?.id ?? "");
-
-  const activePage = useMemo(
-    () => appSpec.pages.find((page) => page.id === activePageId) ?? appSpec.pages[0],
-    [activePageId],
-  );
+  const [activePage, setActivePage] = useState("${defaultKey}");
+  const Page = pages[activePage] ?? Object.values(pages)[0];
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="eyebrow">Generated workspace</span>
-          <h1>{appSpec.title}</h1>
-          <p>{appSpec.prompt}</p>
+          <h1>{appMeta.name}</h1>
+          <p className="tagline">{appMeta.tagline}</p>
         </div>
-
         <nav className="nav">
-          {appSpec.navigation.map((item) => {
-            const isActive = item.pageId === activePage?.id;
-
-            return (
-              <button
-                key={item.id}
-                className={isActive ? "nav-item nav-item--active" : "nav-item"}
-                onClick={() => setActivePageId(item.pageId)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            );
-          })}
+${navButtons}
         </nav>
       </aside>
-
       <main className="content">
-        <header className="hero">
-          <div>
-            <span className="eyebrow">{appSpec.archetype} prototype</span>
-            <h2>{activePage?.title ?? "Preview"}</h2>
-            <p>This local workspace is generated from an intermediate app spec and run inside Docker.</p>
-          </div>
-        </header>
-
-        <section className="section-grid">
-          {activePage?.sections.map((section) => (
-            <article key={section.id} className="panel">
-              <div className="panel-header">
-                <h3>{section.title}</h3>
-                <span>{section.type}</span>
-              </div>
-
-              <div className="section-meta">
-                <span>Placement: {section.placement}</span>
-                <span>Emphasis: {section.emphasis}</span>
-              </div>
-
-              <div className="section-content">
-                {summarizeEntity(section.entityId).length > 0 ? (
-                  <ul>
-                    {summarizeEntity(section.entityId).map((label) => (
-                      <li key={label}>{label}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>Placeholder content driven by the generated page and section structure.</p>
-                )}
-              </div>
-            </article>
-          ))}
-        </section>
+        {Page ? <Page /> : null}
       </main>
     </div>
   );
@@ -129,8 +118,8 @@ function createStylesCss() {
   return `:root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #0b1020;
-  color: #edf2ff;
+  background: #0f172a;
+  color: #e2e8f0;
 }
 
 * {
@@ -141,8 +130,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(70, 112, 255, 0.18), transparent 28%),
-    linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+    radial-gradient(circle at top left, rgba(70, 112, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, #0f172a 0%, #0b1020 100%);
 }
 
 button {
@@ -151,107 +140,90 @@ button {
 
 .shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
   border-right: 1px solid rgba(148, 163, 184, 0.18);
   padding: 28px 20px;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.92);
 }
 
-.brand h1,
-.hero h2,
-.panel h3 {
+.brand h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.tagline {
   margin: 0;
-}
-
-.brand p,
-.hero p,
-.section-content p,
-.section-content li {
-  color: #cbd5e1;
-}
-
-.eyebrow {
-  display: inline-flex;
-  margin-bottom: 10px;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #8ea6ff;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-top: 28px;
 }
 
 .nav-item {
   border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(15, 23, 42, 0.7);
   color: #e2e8f0;
-  padding: 12px 14px;
+  padding: 10px 14px;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.nav-item:hover {
+  border-color: rgba(148, 163, 184, 0.3);
 }
 
 .nav-item--active {
-  border-color: rgba(120, 141, 255, 0.65);
-  background: rgba(47, 66, 145, 0.5);
+  border-color: rgba(120, 141, 255, 0.6);
+  background: rgba(47, 66, 145, 0.45);
 }
 
 .content {
   padding: 32px;
 }
 
-.hero {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 24px;
-  padding: 28px;
-  background: rgba(15, 23, 42, 0.75);
-  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.35);
+.page h2 {
+  margin: 0 0 20px;
+  font-size: 22px;
 }
 
 .section-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
-  margin-top: 24px;
+  gap: 16px;
 }
 
-.panel {
+.card {
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 20px;
   background: rgba(15, 23, 42, 0.72);
 }
 
-.panel-header,
-.section-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
 }
 
-.panel-header span,
-.section-meta span {
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.section-content ul {
+.card p {
   margin: 0;
-  padding-left: 18px;
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.5;
 }
 
-@media (max-width: 920px) {
+@media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -264,40 +236,21 @@ button {
 `;
 }
 
-function createTsConfig() {
-  return `${JSON.stringify(
-    {
-      compilerOptions: {
-        target: "ES2020",
-        useDefineForClassFields: true,
-        lib: ["DOM", "DOM.Iterable", "ES2020"],
-        allowJs: false,
-        skipLibCheck: true,
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        strict: true,
-        forceConsistentCasingInFileNames: true,
-        module: "ESNext",
-        moduleResolution: "Node",
-        resolveJsonModule: true,
-        isolatedModules: true,
-        noEmit: true,
-        jsx: "react-jsx",
-      },
-      include: ["src"],
-    },
-    null,
-    2,
-  )}\n`;
-}
-
 export function createAppFiles(spec: AppSpec) {
-  return [
-    { path: "src/spec.ts", kind: "source" as const, content: createSpecModule(spec) },
-    { path: "src/main.tsx", kind: "source" as const, content: createMainTsx() },
-    { path: "src/App.tsx", kind: "source" as const, content: createAppTsx() },
-    { path: "src/styles.css", kind: "source" as const, content: createStylesCss() },
-    { path: "src/vite-env.d.ts", kind: "source" as const, content: '/// <reference types="vite/client" />\n' },
-    { path: "tsconfig.json", kind: "config" as const, content: createTsConfig() },
+  const files: Array<{ path: string; kind: "source"; content: string }> = [
+    { path: "src/app-meta.ts", kind: "source", content: createAppMetaModule(spec) },
+    { path: "src/App.tsx", kind: "source", content: createAppTsx(spec) },
+    { path: "src/styles.css", kind: "source", content: createStylesCss() },
   ];
+
+  for (const page of spec.pages) {
+    const componentName = toComponentName(page.title);
+    files.push({
+      path: `src/pages/${componentName}.tsx`,
+      kind: "source",
+      content: createPageComponent(page),
+    });
+  }
+
+  return files;
 }

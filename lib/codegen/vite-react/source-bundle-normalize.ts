@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { GeneratedSourceBundle } from "@/lib/codegen/model";
-import { createProjectBriefModuleFile } from "@/lib/codegen/vite-react/project-brief-module";
+import { createAppMetaModuleFile } from "@/lib/codegen/vite-react/app-meta-module";
 import { isAllowedGeneratedSourcePath, viteReactGeneratedSourceRequiredPaths } from "@/lib/codegen/vite-react/source-bundle-contract";
 import { slugify } from "@/lib/domain/app-spec/parse";
 import type { ProjectBrief } from "@/lib/planner/project-brief";
@@ -60,14 +60,22 @@ export const generatedSourceBundleSchema = z
       }
     }
 
-    const appFile = bundle.files.find((file) => file.path === "src/App.tsx");
+    for (const [index, file] of bundle.files.entries()) {
+      if (file.content.includes("projectBrief.") || file.content.includes("appSpec.")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Generated file "${file.path}" references a serialized data model (projectBrief or appSpec). Generated code must use baked-in JSX, not data-driven rendering.`,
+          path: ["files", index, "content"],
+        });
+      }
 
-    if (appFile?.content.includes("projectBrief.sections")) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Generated App.tsx references unsupported "projectBrief.sections". Use projectBrief.pages[n].sectionTitles instead.',
-        path: ["files"],
-      });
+      if (/import\s.*(?:projectBrief|project-brief|appSpec|spec)\b/.test(file.content) && file.path !== "src/app-meta.ts") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Generated file "${file.path}" imports a serialized data model. Use baked-in content instead.`,
+          path: ["files", index, "content"],
+        });
+      }
     }
   });
 
@@ -114,9 +122,9 @@ function normalizeFiles(value: unknown, brief: ProjectBrief) {
     }
   }
 
-  // Always repair the brief module to the canonical ProjectBrief serialization.
-  const projectBriefModule = createProjectBriefModuleFile(brief);
-  byPath.set(projectBriefModule.path, projectBriefModule);
+  // Always inject the canonical app-meta module.
+  const appMetaModule = createAppMetaModuleFile(brief);
+  byPath.set(appMetaModule.path, appMetaModule);
 
   return Array.from(byPath.values()).sort(compareGeneratedSourceFiles);
 }
@@ -130,7 +138,7 @@ function compareGeneratedSourceFiles(
 
 function rankPath(path: string) {
   switch (path) {
-    case "src/project-brief.ts":
+    case "src/app-meta.ts":
       return 0;
     case "src/App.tsx":
       return 1;

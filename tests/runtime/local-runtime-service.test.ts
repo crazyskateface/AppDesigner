@@ -47,9 +47,9 @@ function createPlan(workspaceId: string, appContent: string): WorkspacePlan {
         content: "body { font-family: sans-serif; }",
       },
       {
-        path: "src/project-brief.ts",
+        path: "src/app-meta.ts",
         kind: "source",
-        content: "export const projectBrief = {};",
+        content: "export const appMeta = { name: 'CRM', tagline: '', createdFrom: '' };",
       },
     ],
     generationContext: {
@@ -376,7 +376,7 @@ test("LocalRuntimeService hot-updates app-owned files in place without requiring
     await mkdir(path.join(workspaceRoot, "src"), { recursive: true });
     await writeFile(path.join(workspaceRoot, "src", "App.tsx"), "export default function App() { return <main>Old</main>; }");
     await writeFile(path.join(workspaceRoot, "src", "styles.css"), "body { color: black; }");
-    await writeFile(path.join(workspaceRoot, "src", "project-brief.ts"), "export const projectBrief = {};");
+    await writeFile(path.join(workspaceRoot, "src", "app-meta.ts"), "export const appMeta = { name: 'CRM', tagline: '', createdFrom: '' };");
 
     const initialPlan = createPlan("workspace-live", "export default function App() { return <main>Old</main>; }");
     const updatedPlan = createPlan("workspace-live", "export default function App() { return <main>New</main>; }");
@@ -664,7 +664,7 @@ test("LocalRuntimeService applies direct UI edit files even when the app spec it
     await mkdir(path.join(workspaceRoot, "src", "components"), { recursive: true });
     await writeFile(path.join(workspaceRoot, "src", "App.tsx"), "export default function App() { return <main>Old</main>; }");
     await writeFile(path.join(workspaceRoot, "src", "styles.css"), "body { color: black; }");
-    await writeFile(path.join(workspaceRoot, "src", "project-brief.ts"), "export const projectBrief = {};");
+    await writeFile(path.join(workspaceRoot, "src", "app-meta.ts"), "export const appMeta = { name: 'CRM', tagline: '', createdFrom: '' };");
 
     const initialPlan = createPlan("workspace-live", "export default function App() { return <main>Old</main>; }");
 

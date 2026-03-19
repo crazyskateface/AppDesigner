@@ -59,7 +59,7 @@ test("runWorkspaceOrchestratorApplication produces a direct-codegen workspace pl
 
   assert.equal(plan.projectId, "project-123");
   assert.equal(plan.sourceSpecId, spec.appId);
-  assert.ok(plan.files.some((file) => file.path === "src/project-brief.ts"));
+  assert.ok(plan.files.some((file) => file.path === "src/app-meta.ts"));
   assert.ok(plan.files.some((file) => file.path === "src/App.tsx"));
   assert.ok(plan.files.some((file) => file.path === "src/components/BookingPanel.tsx"));
   assert.match(plan.files.find((file) => file.path === "package.json")?.content ?? "", /react-router-dom/);

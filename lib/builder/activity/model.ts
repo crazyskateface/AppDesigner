@@ -1,5 +1,6 @@
 import type { ClarificationQuestion } from "@/lib/planner/clarification/types";
 import type { ClarificationAnswer } from "@/lib/planner/prompt-context";
+import type { OperationStageStatus } from "@/lib/builder/result/operation-stages";
 
 export type BuilderActivityRole = "assistant" | "user";
 
@@ -19,6 +20,13 @@ export type BuilderActivityTone = "info" | "success" | "warning" | "error";
 
 export type BuilderActivitySource = "builder" | "runtime" | "browser" | "repair";
 
+export type BuilderActivityStagesSummary = {
+  generation: OperationStageStatus;
+  apply: OperationStageStatus;
+  runtime: OperationStageStatus;
+  verification: OperationStageStatus;
+};
+
 export type BuilderActivityItem = {
   id: string;
   timestamp: string;
@@ -32,4 +40,5 @@ export type BuilderActivityItem = {
   dedupeKey?: string;
   questions?: ClarificationQuestion[];
   answers?: ClarificationAnswer[];
+  stagesSummary?: BuilderActivityStagesSummary;
 };

@@ -26,7 +26,7 @@ class StubProvider implements StructuredObjectGenerator {
   }
 }
 
-test("LLM app-files generator repairs the brief module and normalizes allowed file paths", async () => {
+test("LLM app-files generator injects app-meta module and normalizes allowed file paths", async () => {
   const brief = createProjectBriefFromAppSpec(generateFallbackAppSpec("Build a CRM for a solo consultant to track leads and meetings."));
 
   const result = await generateViteReactAppFilesFromProjectBrief(brief, {
@@ -38,7 +38,7 @@ test("LLM app-files generator repairs the brief module and normalizes allowed fi
         {
           path: ".\\src\\App.tsx",
           kind: "source",
-          content: 'import { LeadPanel } from "./components/LeadPanel";\n\nexport default function App() { return <LeadPanel />; }',
+          content: 'import LeadPanel from "./components/LeadPanel";\n\nexport default function App() { return <LeadPanel />; }',
         },
         {
           path: "src/styles.css",
@@ -48,7 +48,7 @@ test("LLM app-files generator repairs the brief module and normalizes allowed fi
         {
           path: "src/components/LeadPanel.tsx",
           kind: "source",
-          content: 'export function LeadPanel() { return <div className="lead-panel">Lead panel</div>; }',
+          content: 'export default function LeadPanel() { return <div className="lead-panel">Lead panel</div>; }',
         },
       ],
       notes: ["Generated bundle"],
@@ -57,7 +57,7 @@ test("LLM app-files generator repairs the brief module and normalizes allowed fi
 
   assert.equal(result.generationMeta.source, "llm");
   assert.equal(result.generationMeta.repaired, true);
-  assert.ok(result.files.some((file) => file.path === "src/project-brief.ts"));
+  assert.ok(result.files.some((file) => file.path === "src/app-meta.ts"));
   assert.ok(result.files.some((file) => file.path === "src/components/LeadPanel.tsx"));
 });
 
@@ -106,7 +106,7 @@ test("source bundle validation rejects disallowed generated file paths", () => {
     targetKind: "vite-react-static",
     entryModule: "src/App.tsx",
     files: [
-      { path: "src/project-brief.ts", kind: "source", content: "export const projectBrief = {};\n" },
+      { path: "src/app-meta.ts", kind: "source", content: "export const appMeta = { name: 'Test', tagline: '', createdFrom: '' };\n" },
       { path: "src/App.tsx", kind: "source", content: "export default function App() { return null; }\n" },
       { path: "src/styles.css", kind: "source", content: "body { margin: 0; }\n" },
       { path: "src/server/index.ts", kind: "source", content: "export const nope = true;\n" },
@@ -117,17 +117,17 @@ test("source bundle validation rejects disallowed generated file paths", () => {
   assert.equal(validation.success, false);
 });
 
-test("source bundle validation rejects unsupported projectBrief.sections references", () => {
+test("source bundle validation rejects data-driven rendering patterns", () => {
   const validation = validateGeneratedSourceBundleCandidate({
-    bundleId: "bad-app-shape",
+    bundleId: "bad-data-driven",
     targetKind: "vite-react-static",
     entryModule: "src/App.tsx",
     files: [
-      { path: "src/project-brief.ts", kind: "source", content: "export const projectBrief = {};\n" },
+      { path: "src/app-meta.ts", kind: "source", content: "export const appMeta = { name: 'Test', tagline: '', createdFrom: '' };\n" },
       {
         path: "src/App.tsx",
         kind: "source",
-        content: 'export default function App() { return <div>{projectBrief.sections[0].title}</div>; }\n',
+        content: 'import { projectBrief } from "./project-brief";\nexport default function App() { return <div>{projectBrief.pages.map(p => <div key={p.id}>{p.title}</div>)}</div>; }\n',
       },
       { path: "src/styles.css", kind: "source", content: "body { margin: 0; }\n" },
     ],
@@ -147,7 +147,8 @@ test("LLM app-files generator can use the explicit template fallback", async () 
 
   assert.equal(result.generationMeta.source, "template-fallback");
   assert.ok(result.files.some((file) => file.path === "src/App.tsx"));
-  assert.ok(result.files.some((file) => file.path === "src/project-brief.ts"));
+  assert.ok(result.files.some((file) => file.path === "src/app-meta.ts"));
+  assert.ok(!result.files.some((file) => file.path === "src/project-brief.ts"));
 });
 
 test("package action executor rejects unsafe package specs", () => {
@@ -179,5 +180,46 @@ test("package action executor rejects unsafe package specs", () => {
         },
       ),
     /unsafe package spec/i,
+  );
+});
+
+test("LLM app-files generator accepts packageRequirements with null version", async () => {
+  const brief = createProjectBriefFromAppSpec(generateFallbackAppSpec("Build a CRM with charts."));
+
+  const result = await generateViteReactAppFilesFromProjectBrief(brief, {
+    provider: new StubProvider({
+      bundleId: "version-null-bundle",
+      targetKind: "vite-react-static",
+      entryModule: "src/App.tsx",
+      files: [
+        {
+          path: "src/App.tsx",
+          kind: "source",
+          content: 'export default function App() { return <div>Charts</div>; }',
+        },
+        {
+          path: "src/styles.css",
+          kind: "source",
+          content: "body { margin: 0; }",
+        },
+      ],
+      packageRequirements: [
+        {
+          name: "recharts",
+          section: "dependencies",
+          version: null,
+        },
+      ],
+      notes: [],
+    }),
+  });
+
+  assert.ok(result.packageRequirements);
+  assert.equal(result.packageRequirements!.length, 1);
+  assert.equal(result.packageRequirements![0].name, "recharts");
+  // version should be undefined or null (normalized away)
+  assert.ok(
+    result.packageRequirements![0].version === undefined || result.packageRequirements![0].version === null,
+    "null version should be accepted",
   );
 });
