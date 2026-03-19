@@ -4,6 +4,7 @@ import { createAppFiles } from "@/lib/workspace/templates/vite-react/app-files";
 import { createDockerfile } from "@/lib/workspace/templates/vite-react/dockerfile";
 import { createIndexHtml } from "@/lib/workspace/templates/vite-react/index-html";
 import { createPackageJson } from "@/lib/workspace/templates/vite-react/package-json";
+import { createRuntimeControlFiles } from "@/lib/workspace/templates/vite-react/runtime-control-files";
 import { createViteConfig } from "@/lib/workspace/templates/vite-react/vite-config";
 
 export const viteReactContainerPort = 4173;
@@ -46,6 +47,7 @@ export function createViteReactWorkspaceFiles(spec: AppSpec, manifest: Workspace
       kind: "config",
       content: "node_modules\nnpm-debug.log\n",
     },
+    ...createRuntimeControlFiles(manifest.containerPort),
     ...createAppFiles(spec),
   ];
 }

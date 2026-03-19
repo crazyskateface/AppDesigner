@@ -1,3 +1,7 @@
+import type { GeneratedFileSet } from "@/lib/codegen/model";
+import type { ProjectBrief } from "@/lib/planner/project-brief";
+import type { ProjectBuildMemory } from "@/lib/project-memory/schema";
+
 export type WorkspaceTargetKind = "vite-react-static";
 
 export type WorkspaceFileKind = "source" | "config" | "asset";
@@ -26,6 +30,11 @@ export type WorkspacePlan = {
   relativeRootPath: string;
   manifest: WorkspaceManifest;
   files: WorkspaceFile[];
+  generationContext?: {
+    projectBrief: ProjectBrief;
+    fileSetMetadata: GeneratedFileSet["metadata"];
+    projectMemory?: ProjectBuildMemory;
+  };
 };
 
 export type MaterializedWorkspace = {
@@ -39,4 +48,5 @@ export type MaterializedWorkspace = {
   manifest: WorkspaceManifest;
   files: WorkspaceFile[];
   writtenAt: string;
+  generationContext?: WorkspacePlan["generationContext"];
 };

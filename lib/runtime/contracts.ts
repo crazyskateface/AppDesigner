@@ -25,7 +25,9 @@ export type RuntimeSnapshot = {
 export interface Runner {
   prepare(target: RuntimeTarget): Promise<void>;
   start(target: RuntimeTarget): Promise<RunnerHandle>;
+  restartDevServer(handle: RunnerHandle): Promise<void>;
   stop(handle: RunnerHandle): Promise<void>;
   getStatus(handle: RunnerHandle): Promise<RunnerStatus>;
   getLogs(handle: RunnerHandle): Promise<RuntimeLogEntry[]>;
+  getPreparationLogs(target: RuntimeTarget): Promise<RuntimeLogEntry[]>;
 }

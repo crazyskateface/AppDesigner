@@ -4,5 +4,16 @@ declare global {
   var __appDesignerRuntimeService__: LocalRuntimeService | undefined;
 }
 
-export const runtimeService =
-  globalThis.__appDesignerRuntimeService__ ?? (globalThis.__appDesignerRuntimeService__ = new LocalRuntimeService());
+function getOrCreateRuntimeService() {
+  const current = globalThis.__appDesignerRuntimeService__;
+
+  if (current && typeof current.getRuntimeWorkspaceFiles === "function") {
+    return current;
+  }
+
+  const next = new LocalRuntimeService();
+  globalThis.__appDesignerRuntimeService__ = next;
+  return next;
+}
+
+export const runtimeService = getOrCreateRuntimeService();

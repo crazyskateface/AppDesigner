@@ -16,6 +16,11 @@ type OpenAiChatCompletionResponse = {
 
 export class OpenAiConfigurationError extends Error {}
 
+export type OpenAiChatCompletionResult = {
+  payload: OpenAiChatCompletionResponse;
+  rawText: string;
+};
+
 export async function createOpenAiChatCompletion(body: Record<string, unknown>) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
@@ -33,11 +38,21 @@ export async function createOpenAiChatCompletion(body: Record<string, unknown>) 
     cache: "no-store",
   });
 
-  const payload = (await response.json()) as OpenAiChatCompletionResponse;
+  const rawText = await response.text();
+  let payload: OpenAiChatCompletionResponse;
+
+  try {
+    payload = JSON.parse(rawText) as OpenAiChatCompletionResponse;
+  } catch {
+    throw new Error("OpenAI returned invalid JSON.");
+  }
 
   if (!response.ok) {
     throw new Error(payload.error?.message || "OpenAI request failed.");
   }
 
-  return payload;
+  return {
+    payload,
+    rawText,
+  } satisfies OpenAiChatCompletionResult;
 }

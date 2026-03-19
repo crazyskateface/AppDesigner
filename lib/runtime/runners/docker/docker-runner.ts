@@ -17,6 +17,15 @@ function createLogEntry(stream: RuntimeLogEntry["stream"], message: string): Run
   };
 }
 
+async function isPreviewReachable(url: string) {
+  try {
+    const response = await fetch(url);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function waitForPreview(url: string, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
 
@@ -39,6 +48,10 @@ async function removeExistingContainer(containerName: string) {
   try {
     await runDockerCommand(["rm", "-f", containerName]);
   } catch {}
+}
+
+async function runDockerExec(containerName: string, command: string[]) {
+  return runDockerCommand(["exec", containerName, ...command]);
 }
 
 export class DockerRunner implements Runner {
@@ -108,6 +121,28 @@ export class DockerRunner implements Runner {
     }
   }
 
+  async restartDevServer(handle: RunnerHandle) {
+    const containerName = getDockerContainerName(handle.target);
+    const existing = this.logsByRunId.get(handle.runId) ?? [];
+
+    this.statusByRunId.set(handle.runId, "starting");
+
+    try {
+      await runDockerExec(containerName, ["sh", "/workspace/.appdesigner/runtime/restart-dev-server.sh"]);
+      await waitForPreview(handle.target.previewUrl, 15_000);
+      this.statusByRunId.set(handle.runId, "running");
+      this.logsByRunId.set(handle.runId, [
+        ...existing,
+        createLogEntry("system", "Restarted the dev server inside the running container."),
+      ]);
+    } catch (error) {
+      this.statusByRunId.set(handle.runId, "failed");
+      const message = error instanceof Error ? error.message : "Failed to restart the dev server inside the container.";
+      this.logsByRunId.set(handle.runId, [...existing, createLogEntry("stderr", message)]);
+      throw error;
+    }
+  }
+
   async stop(handle: RunnerHandle) {
     const containerName = getDockerContainerName(handle.target);
 
@@ -123,8 +158,34 @@ export class DockerRunner implements Runner {
       const state = stdout.trim();
 
       if (state === "running") {
-        this.statusByRunId.set(handle.runId, "running");
-        return "running";
+        try {
+          const { stdout } = await runDockerExec(containerName, ["sh", "/workspace/.appdesigner/runtime/dev-server-status.sh"]);
+          const devServerState = stdout.trim();
+
+          if (devServerState !== "running") {
+            this.statusByRunId.set(handle.runId, "failed");
+            return "failed";
+          }
+
+          if (await isPreviewReachable(handle.target.previewUrl)) {
+            this.statusByRunId.set(handle.runId, "running");
+            return "running";
+          }
+
+          this.statusByRunId.set(handle.runId, "starting");
+          return "starting";
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+
+          if (message.includes("No such file or directory")) {
+            const reachable = await isPreviewReachable(handle.target.previewUrl);
+            this.statusByRunId.set(handle.runId, reachable ? "running" : "failed");
+            return reachable ? "running" : "failed";
+          }
+
+          this.statusByRunId.set(handle.runId, "failed");
+          return "failed";
+        }
       }
 
       if (state === "exited" || state === "dead") {
@@ -173,5 +234,10 @@ export class DockerRunner implements Runner {
 
       return [...existing, createLogEntry("stderr", message)];
     }
+  }
+
+  async getPreparationLogs(target: RuntimeTarget) {
+    const containerName = getDockerContainerName(target);
+    return this.logsByRunId.get(containerName) ?? [];
   }
 }

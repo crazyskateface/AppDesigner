@@ -2,8 +2,9 @@ import Link from "next/link";
 
 import { AppShellPreview } from "@/components/preview/app-shell/app-shell-preview";
 import { RecentProjectsList } from "@/components/recent-projects/recent-projects-list";
-import { generateAppSpec, promptExamples, supportedAppTypes } from "@/lib/domain/app-spec";
+import { supportedAppTypes } from "@/lib/domain/app-spec";
 import { appSpecToPreviewModel } from "@/lib/preview/adapters/spec-to-preview";
+import { homepageSampleSpec } from "@/lib/samples/homepage-sample";
 
 const principles = [
   {
@@ -26,8 +27,7 @@ const highlights = [
   "Polished, minimal UI intended for fast founder demos",
 ];
 
-const sampleSpec = generateAppSpec(promptExamples[0]);
-const samplePreviewModel = appSpecToPreviewModel(sampleSpec);
+const samplePreviewModel = appSpecToPreviewModel(homepageSampleSpec);
 
 export default function Home() {
   return (

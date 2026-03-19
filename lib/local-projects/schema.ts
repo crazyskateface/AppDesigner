@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { appArchetypeSchema, appSpecSchema } from "@/lib/domain/app-spec/schema";
+import { createEmptyProjectBuildMemory } from "@/lib/project-memory/update-memory";
+import { projectBuildMemorySchema } from "@/lib/project-memory/schema";
 
 export const localProjectsStorageVersion = 1;
 
@@ -13,14 +15,18 @@ const persistedProjectStoredSchema = z.object({
   prompt: z.string(),
   generatedSpec: appSpecSchema.nullable().optional(),
   generatedConfig: appSpecSchema.nullable().optional(),
+  lastRuntimeId: z.string().min(1).nullable().optional(),
+  projectMemory: projectBuildMemorySchema.optional(),
   manualTitleOverride: z.string().trim().min(1).nullable(),
   selectedPreviewPageId: z.string().min(1).nullable(),
 });
 
 export const persistedProjectSchema = persistedProjectStoredSchema.transform(
-  ({ generatedSpec, generatedConfig, ...project }) => ({
+  ({ generatedSpec, generatedConfig, lastRuntimeId, projectMemory, ...project }) => ({
     ...project,
     generatedSpec: generatedSpec ?? generatedConfig ?? null,
+    lastRuntimeId: lastRuntimeId ?? null,
+    projectMemory: projectMemory ?? createEmptyProjectBuildMemory(project.projectId),
   }),
 );
 

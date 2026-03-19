@@ -21,3 +21,23 @@ test("generate route rejects edit mode without currentSpec", async () => {
   assert.equal(response.status, 400);
   assert.equal(payload.error, "Please enter a more descriptive prompt about the app you want to build.");
 });
+
+test("generate route proceeds when the model does not explicitly request clarification", async () => {
+  const request = new Request("http://localhost/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt: "Build an app for my business team to use every day.",
+      mode: "create",
+    }),
+  });
+
+  const response = await POST(request);
+  const payload = (await response.json()) as { status?: string; appSpec?: { title?: string } };
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.status, "generation_ready");
+  assert.equal(typeof payload.appSpec?.title, "string");
+});

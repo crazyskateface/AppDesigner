@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { LivePreviewFrame } from "@/components/builder/live-preview-frame";
 import { RuntimeStatusCard } from "@/components/builder/runtime-status-card";
-import type { RuntimeSession } from "@/lib/runtime/service/dto";
+import type { BrowserRuntimeErrorReport, RuntimeSession } from "@/lib/runtime/service/dto";
 
 type RuntimePreviewPanelProps = {
   session: RuntimeSession | null;
@@ -14,6 +14,7 @@ type RuntimePreviewPanelProps = {
   onStart: () => void;
   onRestart: () => void;
   onStop: () => void;
+  onClientRuntimeError: (report: BrowserRuntimeErrorReport) => void;
   schemaPreview: ReactNode;
 };
 
@@ -25,6 +26,7 @@ export function RuntimePreviewPanel({
   onStart,
   onRestart,
   onStop,
+  onClientRuntimeError,
   schemaPreview,
 }: RuntimePreviewPanelProps) {
   const isRunning = session?.status === "running" && Boolean(session.previewUrl);
@@ -41,7 +43,11 @@ export function RuntimePreviewPanel({
       />
 
       <div className="min-h-0 flex-1 p-2">
-        {isRunning && session?.previewUrl ? <LivePreviewFrame previewUrl={session.previewUrl} /> : schemaPreview}
+        {isRunning && session?.previewUrl ? (
+          <LivePreviewFrame previewUrl={session.previewUrl} onClientRuntimeError={onClientRuntimeError} />
+        ) : (
+          schemaPreview
+        )}
       </div>
 
       {error ? (

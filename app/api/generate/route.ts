@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { builderRequestSchema } from "@/lib/domain/app-spec";
-import { generateAppSpecFromPrompt } from "@/lib/spec-pipeline/app-spec-generation-orchestrator";
+import { builderGenerateRequestSchema } from "@/lib/builder/generation/contract";
+import { resolveBuilderGenerateRequest } from "@/lib/builder/generation/resolve-request";
+import { logBackendEvent } from "@/lib/observability/backend-logger";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -12,9 +13,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
   }
 
-  const parsedRequest = builderRequestSchema.safeParse(body);
+  const parsedRequest = builderGenerateRequestSchema.safeParse(body);
 
   if (!parsedRequest.success) {
+    logBackendEvent({
+      area: "api.generate",
+      event: "validation-failed",
+      message: "Rejected invalid generate request.",
+      level: "warn",
+    });
     return NextResponse.json(
       {
         error: "Please enter a more descriptive prompt about the app you want to build.",
@@ -25,12 +32,39 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await generateAppSpecFromPrompt(parsedRequest.data.prompt, {
-      mode: parsedRequest.data.mode,
-      currentSpec: parsedRequest.data.currentSpec,
+    logBackendEvent({
+      area: "api.generate",
+      event: "request-started",
+      message: "Resolving builder generate request.",
+      context: {
+        mode: parsedRequest.data.mode,
+        hasRuntimeId: Boolean(parsedRequest.data.runtimeId),
+        promptLength: parsedRequest.data.prompt.length,
+      },
+    });
+    const result = await resolveBuilderGenerateRequest(parsedRequest.data);
+    logBackendEvent({
+      area: "api.generate",
+      event: "request-finished",
+      message: "Builder generate request resolved.",
+      context: {
+        mode: parsedRequest.data.mode,
+        status: result.status,
+        changeStatus: result.status === "generation_ready" ? result.changeStatus : undefined,
+      },
     });
     return NextResponse.json(result);
   } catch (error) {
+    logBackendEvent({
+      area: "api.generate",
+      event: "request-failed",
+      message: "Builder generate request failed.",
+      level: "error",
+      context: {
+        mode: parsedRequest.data.mode,
+      },
+      error,
+    });
     return NextResponse.json(
       {
         error:

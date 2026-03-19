@@ -16,6 +16,16 @@ export function WorkspaceTerminal({ entries, runtimeSession, runtimeError }: Wor
   const [isExpanded, setIsExpanded] = useState(false);
   const statusLabel = runtimeSession?.status ?? "idle";
   const shouldShowBadge = entries.length > 0 || Boolean(runtimeError);
+  const browserCount = entries.filter((entry) => entry.stream === "browser").length;
+  const runnerCount = entries.filter((entry) => entry.stream === "stdout" || entry.stream === "stderr").length;
+
+  const summaryLabel = browserCount
+    ? `${runnerCount} runner / ${browserCount} browser`
+    : runnerCount
+      ? `${runnerCount} runner`
+      : entries.length
+        ? `${entries.length} events`
+        : "Read-only";
 
   return (
     <section
@@ -25,13 +35,16 @@ export function WorkspaceTerminal({ entries, runtimeSession, runtimeError }: Wor
     >
       <div className="flex h-12 items-center justify-between px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <p className="text-sm font-medium text-[var(--color-ink)]">Terminal</p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--color-ink)]">Terminal</p>
+            <p className="text-[11px] leading-5 text-[var(--color-muted)]">Raw runner and browser events. Read-only for now.</p>
+          </div>
           <span className="text-[11px] font-medium tracking-[0.14em] text-[var(--color-muted)] uppercase">
             {statusLabel}
           </span>
           {shouldShowBadge ? (
             <span className="rounded-full bg-[var(--color-panel)] px-2 py-1 text-[10px] font-medium tracking-[0.08em] text-[var(--color-muted)] uppercase">
-              {entries.length ? `${entries.length} logs` : "Issue"}
+              {summaryLabel}
             </span>
           ) : null}
         </div>
@@ -56,7 +69,7 @@ export function WorkspaceTerminal({ entries, runtimeSession, runtimeError }: Wor
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted)]">
               {runtimeError
                 ? runtimeError
-                : "Start the live preview to stream Docker build and runtime output into this terminal area."}
+                : "Start the live preview to stream build, runtime, browser, and repair output into this terminal area."}
             </p>
           </div>
         )}

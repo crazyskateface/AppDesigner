@@ -1,4 +1,5 @@
 import type { AppSpec } from "@/lib/domain/app-spec";
+import type { ProjectBuildMemory } from "@/lib/project-memory/schema";
 import { materializedWorkspaceToRuntimeTarget } from "@/lib/runtime/adapters/workspace-to-runtime-target";
 import { materializeWorkspaceToLocalFs } from "@/lib/workspace/materializers/local-fs";
 import type { MaterializedWorkspace, WorkspacePlan } from "@/lib/workspace/model";
@@ -8,7 +9,7 @@ import { generateAppSpecFromPrompt } from "@/lib/spec-pipeline/app-spec-generati
 
 export type GenerationPipeline = {
   generateSpec: (prompt: string) => Promise<AppSpec>;
-  planWorkspace: (spec: AppSpec, projectId: string) => WorkspacePlan;
+  planWorkspace: (spec: AppSpec, projectId: string, projectMemory?: ProjectBuildMemory) => Promise<WorkspacePlan>;
   materializeWorkspace: (plan: WorkspacePlan) => Promise<MaterializedWorkspace>;
   createRuntimeTarget: (workspace: MaterializedWorkspace) => Promise<RuntimeTarget>;
 };
@@ -19,8 +20,8 @@ export function createGenerationPipeline(): GenerationPipeline {
       const result = await generateAppSpecFromPrompt(prompt);
       return result.appSpec;
     },
-    planWorkspace(spec, projectId) {
-      return specToWorkspacePlan(spec, projectId);
+    async planWorkspace(spec, projectId, projectMemory) {
+      return specToWorkspacePlan(spec, projectId, projectMemory);
     },
     async materializeWorkspace(plan) {
       return materializeWorkspaceToLocalFs(plan);

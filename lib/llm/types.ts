@@ -7,6 +7,8 @@ export type StructuredGenerationRequest = {
 
 export type StructuredGenerationResult = {
   content: unknown;
+  rawText?: string;
+  rawProviderResponseText?: string;
   provider: {
     name: string;
     model?: string;

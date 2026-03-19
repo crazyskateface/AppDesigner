@@ -17,7 +17,19 @@ export function RuntimeLogList({ entries }: RuntimeLogListProps) {
         {entries.map((entry) => (
           <div key={entry.id} className="grid gap-1">
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-white/45">
-              <span>{entry.stream}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 ${
+                  entry.stream === "browser"
+                    ? "bg-emerald-500/20 text-emerald-200"
+                    : entry.stream === "stderr"
+                      ? "bg-amber-500/20 text-amber-200"
+                      : entry.stream === "system"
+                        ? "bg-sky-500/20 text-sky-200"
+                        : "bg-white/10 text-white/60"
+                }`}
+              >
+                {entry.stream}
+              </span>
               <span>{new Date(entry.timestamp).toLocaleTimeString()}</span>
             </div>
             <div className="break-words text-white/80">{entry.message}</div>

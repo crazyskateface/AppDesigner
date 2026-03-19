@@ -4,7 +4,9 @@ WORKDIR /workspace
 COPY package*.json ./
 RUN npm install
 COPY . .
+RUN chmod +x .appdesigner/runtime/*.sh
+ENV PORT=${containerPort}
 EXPOSE ${containerPort}
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "${containerPort}"]
+CMD ["sh", "./.appdesigner/runtime/container-entrypoint.sh"]
 `;
 }

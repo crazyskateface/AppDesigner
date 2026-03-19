@@ -1,4 +1,4 @@
-export type RuntimeLogStream = "stdout" | "stderr" | "system";
+export type RuntimeLogStream = "stdout" | "stderr" | "system" | "browser";
 
 export type RuntimeLogEntry = {
   id: string;
@@ -13,6 +13,7 @@ export type RuntimeErrorCode =
   | "image_build_failed"
   | "container_start_failed"
   | "port_binding_failed"
+  | "client_runtime_failed"
   | "log_read_failed";
 
 export type RuntimeFailure = {

@@ -6,9 +6,11 @@ import {
   type AppSpecGenerationMeta,
   type GenerateAppSpecResponse,
 } from "@/lib/domain/app-spec/schema";
-import { openAiAppSpecProvider } from "@/lib/llm/openai/app-spec-provider";
+import { openAiStructuredObjectProvider } from "@/lib/llm/openai/structured-provider";
 import { OpenAiConfigurationError } from "@/lib/llm/openai/client";
+import { logStructuredProviderResponse } from "@/lib/llm/debug-log";
 import type { StructuredObjectGenerator } from "@/lib/llm/types";
+import { formatPromptContextForLlm, type PromptContextEnvelope } from "@/lib/planner/prompt-context";
 import { appSpecJsonSchema, buildAppSpecCreatePrompts } from "@/lib/spec-contract/app-spec-contract";
 import { buildAppSpecEditInstructions, buildAppSpecEditPromptContext } from "@/lib/spec-contract/app-spec-edit-contract";
 import { createFallbackAppSpec } from "@/lib/spec-pipeline/app-spec-fallback";
@@ -23,13 +25,17 @@ type GenerateAppSpecOptions = {
 };
 
 export async function generateAppSpecFromPrompt(
-  prompt: string,
+  prompt: string | PromptContextEnvelope,
   options: GenerateAppSpecOptions = {},
 ): Promise<GenerateAppSpecResponse> {
-  const normalizedPrompt = normalizePrompt(prompt);
-  const provider = options.provider ?? openAiAppSpecProvider;
+  const normalizedPrompt = typeof prompt === "string" ? normalizePrompt(prompt) : prompt.prompt;
+  const provider = options.provider ?? openAiStructuredObjectProvider;
   const mode = options.mode ?? "create";
-  const { systemPrompt, userPrompt } = buildPrompts(normalizedPrompt, mode, options.currentSpec);
+  const promptContext =
+    typeof prompt === "string"
+      ? undefined
+      : prompt;
+  const { systemPrompt, userPrompt } = buildPrompts(normalizedPrompt, mode, options.currentSpec, promptContext);
 
   try {
     const providerResult = await provider.generateStructuredObject({
@@ -38,6 +44,11 @@ export async function generateAppSpecFromPrompt(
       schemaName: "app_spec",
       jsonSchema: appSpecJsonSchema,
     });
+
+    logStructuredProviderResponse(
+      "app-spec",
+      providerResult.rawProviderResponseText ?? providerResult.rawText ?? providerResult.content,
+    );
 
     const parsedCandidate = parseAppSpecCandidate(providerResult.content);
     const initialValidation = appSpecSchema.safeParse(parsedCandidate);
@@ -81,7 +92,9 @@ export async function generateAppSpecFromPrompt(
   }
 }
 
-function buildPrompts(prompt: string, mode: BuilderMode, currentSpec?: AppSpec) {
+function buildPrompts(prompt: string, mode: BuilderMode, currentSpec?: AppSpec, promptContext?: PromptContextEnvelope) {
+  const contextBlock = promptContext ? `Planning context:\n${formatPromptContextForLlm(promptContext)}` : undefined;
+
   if (mode === "edit" && currentSpec) {
     const createPrompts = buildAppSpecCreatePrompts(prompt);
 
@@ -89,13 +102,25 @@ function buildPrompts(prompt: string, mode: BuilderMode, currentSpec?: AppSpec) 
       systemPrompt: [createPrompts.systemPrompt, buildAppSpecEditInstructions()].join("\n\n"),
       userPrompt: [
         createPrompts.userPrompt,
+        contextBlock,
         "Current AppSpec:",
         buildAppSpecEditPromptContext(currentSpec),
-      ].join("\n\n"),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
     };
   }
 
-  return buildAppSpecCreatePrompts(prompt);
+  const prompts = buildAppSpecCreatePrompts(prompt);
+
+  if (!contextBlock) {
+    return prompts;
+  }
+
+  return {
+    systemPrompt: prompts.systemPrompt,
+    userPrompt: [prompts.userPrompt, contextBlock].join("\n\n"),
+  };
 }
 
 function fallbackResult(

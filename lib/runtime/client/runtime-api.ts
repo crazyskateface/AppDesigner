@@ -1,11 +1,28 @@
 "use client";
 
 import type { RuntimeLogEntry } from "@/lib/runtime/logs";
-import type { RuntimeLogPage, RuntimeSession } from "@/lib/runtime/service/dto";
+import type { ProjectBuildMemory } from "@/lib/project-memory/schema";
+import type {
+  BrowserRuntimeErrorReport,
+  RuntimeLogPage,
+  RuntimeSession,
+  RuntimeUpdateResult,
+} from "@/lib/runtime/service/dto";
 
 type StartRuntimeInput = {
   projectId: string;
   generatedSpec: import("@/lib/domain/app-spec").AppSpec;
+  projectMemory?: ProjectBuildMemory;
+  directEdit?: {
+    strategy: "direct-ui-source-edit";
+    summary: string;
+    files: Array<{
+      path: string;
+      kind: "source" | "config" | "asset";
+      content: string;
+    }>;
+    notes?: string[];
+  };
 };
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
@@ -55,6 +72,46 @@ export async function stopRuntime(runtimeId: string) {
   return parseJsonResponse<RuntimeSession>(response);
 }
 
+export async function reportClientRuntimeError(runtimeId: string, report: BrowserRuntimeErrorReport) {
+  const response = await fetch(`/api/runtime/${runtimeId}/client-error`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(report),
+  });
+
+  return parseJsonResponse<RuntimeSession>(response);
+}
+
+export async function updateRuntime(
+  runtimeId: string,
+  input: {
+    generatedSpec: import("@/lib/domain/app-spec").AppSpec;
+    projectMemory?: ProjectBuildMemory;
+    directEdit?: {
+      strategy: "direct-ui-source-edit";
+      summary: string;
+      files: Array<{
+        path: string;
+        kind: "source" | "config" | "asset";
+        content: string;
+      }>;
+      notes?: string[];
+    };
+  },
+) {
+  const response = await fetch(`/api/runtime/${runtimeId}/update`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseJsonResponse<RuntimeUpdateResult>(response);
+}
+
 export async function awaitRuntimeReady(runtimeId: string, attempts = 30, delayMs = 1_000) {
   let current = await getRuntimeSnapshot(runtimeId);
 
@@ -70,6 +127,6 @@ export async function awaitRuntimeReady(runtimeId: string, attempts = 30, delayM
   return current;
 }
 
-export function takeRecentRuntimeLogs(entries: RuntimeLogEntry[], count = 8) {
+export function takeRecentRuntimeLogs(entries: RuntimeLogEntry[], count = 40) {
   return entries.slice(-count);
 }
