@@ -388,10 +388,10 @@ test("direct-ui-source-edit assistant summary does not claim verified success", 
   );
 });
 
-test("app-spec-edit with landed verification still classifies as verified_success", () => {
+test("non-direct-edit with landed verification still classifies as verified_success", () => {
   const result = deriveGroundedBuildResult({
     ...directUiEditLandedInput(),
-    editStrategy: "app-spec-edit",
+    editStrategy: null,
   });
   assert.equal(result.classification, "verified_success");
 });

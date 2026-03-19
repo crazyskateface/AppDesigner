@@ -64,36 +64,50 @@ export async function resolveBuilderGenerateRequest(
   if (input.mode === "edit" && input.currentSpec && input.runtimeId) {
     const editStrategy = resolveEditModeStrategy(input.prompt);
 
-    if (editStrategy === "direct-ui-source-edit") {
-      const workspaceContext = getRuntimeService().getRuntimeWorkspaceFiles(input.runtimeId);
-      const currentFiles = workspaceContext.files.filter((file) => file.kind === "source");
-      const directEdit = await generateDirectUiEdit(
-        {
-          prompt: input.prompt,
-          currentFiles,
-          appTitle: input.currentSpec.title,
-        },
-        {
-          provider: options.provider,
-        },
-      );
+    if (editStrategy === "out-of-scope") {
       return {
         status: "generation_ready",
-        assistantMessage: summarizePreparedDirectEdit(input.currentSpec.title, directEdit),
-        changeStatus: "changed",
+        assistantMessage:
+          "This request involves changes outside the app source tree (infrastructure, dependencies, backend, or config). " +
+          "I can only edit app-owned source files like components, pages, routes, styles, and app logic. " +
+          "Try rephrasing as a UI or source code change, or handle the infrastructure change manually.",
+        changeStatus: "unchanged",
         appSpec: input.currentSpec,
         generationMeta: {
           source: "llm",
           repaired: false,
         },
-        directEdit: {
-          strategy: "direct-ui-source-edit",
-          summary: directEdit.summary,
-          files: directEdit.files,
-          notes: directEdit.notes,
-        },
       };
     }
+
+    const workspaceContext = getRuntimeService().getRuntimeWorkspaceFiles(input.runtimeId);
+    const currentFiles = workspaceContext.files.filter((file) => file.kind === "source");
+    const directEdit = await generateDirectUiEdit(
+      {
+        prompt: input.prompt,
+        currentFiles,
+        appTitle: input.currentSpec.title,
+      },
+      {
+        provider: options.provider,
+      },
+    );
+    return {
+      status: "generation_ready",
+      assistantMessage: summarizePreparedDirectEdit(input.currentSpec.title, directEdit),
+      changeStatus: "changed",
+      appSpec: input.currentSpec,
+      generationMeta: {
+        source: "llm",
+        repaired: false,
+      },
+      directEdit: {
+        strategy: "direct-ui-source-edit",
+        summary: directEdit.summary,
+        files: directEdit.files,
+        notes: directEdit.notes,
+      },
+    };
   }
 
   const generation = await generateAppSpecFromPrompt(promptContext, {

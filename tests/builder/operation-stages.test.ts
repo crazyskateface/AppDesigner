@@ -299,11 +299,11 @@ test("direct-ui-source-edit with landed verification yields partial verification
   );
 });
 
-test("app-spec-edit with landed verification still yields succeeded verification stage", () => {
+test("non-direct-edit with landed verification still yields succeeded verification stage", () => {
   const stages = deriveOperationStages({
     mode: "edit",
     generationMeta: llmMeta,
-    editStrategy: "app-spec-edit",
+    editStrategy: null,
     updateResult: {
       session: {
         runtimeId: "r1",

@@ -1,48 +1,35 @@
-export type EditModeStrategy = "direct-ui-source-edit" | "app-spec-edit";
+export type EditModeStrategy = "direct-ui-source-edit" | "out-of-scope";
 
-const directUiPatterns = [
-  /\btestimonials?\b/i,
-  /\bquote(?:s| block)?\b/i,
-  /\bhappy customers?\b/i,
-  /\bpromo(?:tional)? section\b/i,
-  /\bhero section\b/i,
-  /\bheadline\b/i,
-  /\bsubheadline\b/i,
-  /\bcontent block\b/i,
-  /\btext section\b/i,
-  /\bcopy block\b/i,
-  /\bcopy\b/i,
-  /\btext\b/i,
-  /\bembed\b/i,
-  /\biframe\b/i,
-  /\bvideo\b/i,
-  /\bsection\b/i,
-  /\blayout\b/i,
-  /\bbanner\b/i,
-  /\breshuffle\b/i,
-  /\breorder\b/i,
-  /\bmove\b.+\bsection\b/i,
-  /\bcta\b/i,
-];
-
-const appSpecPatterns = [
-  /\badd (?:a )?(dashboard|settings|calendar|booking|overview) page\b/i,
-  /\bnew page\b/i,
-  /\brename (?:the )?app\b/i,
-  /\bchange archetype\b/i,
-  /\badd (?:a )?(table|list|activity|form|stats) section\b/i,
-  /\bnavigation\b/i,
-  /\bentity\b/i,
-  /\bworkflow\b/i,
+const outOfScopePatterns = [
+  /\b(?:add|install|update|upgrade)\b.+\b(?:package|dependency|dependencies|npm|yarn)\b/i,
+  /\bpackage\.json\b/i,
+  /\bvite\.config\b/i,
+  /\btailwind\.config\b/i,
+  /\btsconfig\b/i,
+  /\bDockerfile\b/i,
+  /\bdocker[- ]?compose\b/i,
+  /\b\.env\b/i,
+  /\benvironment variable/i,
+  /\bbackend\b/i,
+  /\bserver[- ]?side\b/i,
+  /\bapi (?:route|endpoint|server)\b/i,
+  /\bdatabase\b/i,
+  /\bsupabase\b/i,
+  /\bfirebase\b/i,
+  /\bstripe\b/i,
+  /\bcheckout\b/i,
+  /\boauth\b/i,
+  /\bgoogle login\b/i,
+  /\bauthentication\b/i,
+  /\bimage upload\b.+\bstorage\b/i,
+  /\bbuild pipeline\b/i,
+  /\bci\/?cd\b/i,
+  /\bdeployment\b/i,
 ];
 
 export function resolveEditModeStrategy(prompt: string): EditModeStrategy {
-  if (directUiPatterns.some((pattern) => pattern.test(prompt))) {
-    return "direct-ui-source-edit";
-  }
-
-  if (appSpecPatterns.some((pattern) => pattern.test(prompt))) {
-    return "app-spec-edit";
+  if (outOfScopePatterns.some((pattern) => pattern.test(prompt))) {
+    return "out-of-scope";
   }
 
   return "direct-ui-source-edit";

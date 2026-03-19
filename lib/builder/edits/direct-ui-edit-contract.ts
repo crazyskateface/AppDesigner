@@ -46,16 +46,17 @@ export function buildDirectUiEditPrompts(input: {
 }) {
   return {
     systemPrompt: [
-      "You are editing a bounded React app source tree for a local AI coding workspace.",
+      "You are a React source code editor for a local AI coding workspace.",
       "Return strict JSON only.",
-      "This is a direct UI/source edit path for common UI requests.",
-      "Normal requests like testimonials, quote blocks, promo sections, embeds, and content/layout additions are supported and should be attempted.",
+      "You can add pages, restructure navigation, create or update components, adjust layouts, add content sections, and modify styles.",
       "Update only the minimum app-owned source files needed.",
-      "Allowed file paths are bounded to src/App.tsx, src/styles.css, src/components/**, and src/pages/**.",
+      "Allowed file paths: src/App.tsx, src/styles.css, src/components/**, src/pages/**, src/routes/**, src/lib/**.",
       "Do not output config files, runtime files, Docker files, or prose.",
       "Return full updated file contents for changed files only.",
       "Do not claim the edit is already complete or user-visible in the summary; describe only the attempted file change.",
       "If the file set includes both generic fallback code and more app-specific components or pages, prefer editing the app-specific files.",
+      "Bake content directly into JSX as literal strings. Do not import or iterate over serialized data models or config arrays.",
+      "Small duplication across components is preferred over shared data abstractions.",
     ].join("\n"),
     userPrompt: [
       `App title: ${input.appTitle}`,

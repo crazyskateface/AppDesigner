@@ -711,7 +711,7 @@ export function BuilderExperience() {
               previousSpec,
               nextSpec: generatedSpec,
               updateResult,
-              editStrategy: generated.directEdit ? "direct-ui-source-edit" : "app-spec-edit",
+              editStrategy: generated.directEdit ? "direct-ui-source-edit" : null,
             }),
             updateResult.session.projectId,
           );
@@ -790,7 +790,7 @@ export function BuilderExperience() {
           updateResult,
           restartedRuntimeSession: restartedSession,
           restartReason: updateResult?.reason ?? null,
-          editStrategy: generated.directEdit ? "direct-ui-source-edit" : mode === "edit" ? "app-spec-edit" : null,
+          editStrategy: generated.directEdit ? "direct-ui-source-edit" : null,
         }),
         restartedSession.projectId,
       );
@@ -824,7 +824,7 @@ export function BuilderExperience() {
           updateResult,
           restartReason: updateResult?.reason ?? null,
           applyErrorMessage: message,
-          editStrategy: generated.directEdit ? "direct-ui-source-edit" : mode === "edit" ? "app-spec-edit" : null,
+          editStrategy: generated.directEdit ? "direct-ui-source-edit" : null,
         }),
       );
       setSessionNotice(groundedResult.assistant.message);

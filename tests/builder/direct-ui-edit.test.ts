@@ -15,9 +15,19 @@ test("resolveEditModeStrategy routes common UI prompts to direct source edit", (
   assert.equal(resolveEditModeStrategy("Reorder the sections and update the hero copy."), "direct-ui-source-edit");
 });
 
-test("resolveEditModeStrategy keeps schema-oriented page/entity edits on the AppSpec path", () => {
-  assert.equal(resolveEditModeStrategy("Add a settings page with a form."), "app-spec-edit");
-  assert.equal(resolveEditModeStrategy("Add an entity for customer accounts and update the navigation."), "app-spec-edit");
+test("resolveEditModeStrategy routes page and navigation edits to direct source edit", () => {
+  assert.equal(resolveEditModeStrategy("Add a settings page with a form."), "direct-ui-source-edit");
+  assert.equal(resolveEditModeStrategy("Update the navigation to include a new dashboard link."), "direct-ui-source-edit");
+  assert.equal(resolveEditModeStrategy("Add a table section to the main page."), "direct-ui-source-edit");
+});
+
+test("resolveEditModeStrategy returns out-of-scope for infrastructure requests", () => {
+  assert.equal(resolveEditModeStrategy("Add Stripe checkout to the app."), "out-of-scope");
+  assert.equal(resolveEditModeStrategy("Install a new npm package for charts."), "out-of-scope");
+  assert.equal(resolveEditModeStrategy("Set up Supabase authentication."), "out-of-scope");
+  assert.equal(resolveEditModeStrategy("Update the Dockerfile to use a different base image."), "out-of-scope");
+  assert.equal(resolveEditModeStrategy("Add a backend API endpoint for user data."), "out-of-scope");
+  assert.equal(resolveEditModeStrategy("Configure the deployment pipeline."), "out-of-scope");
 });
 
 test("direct UI edit contract accepts bounded testimonials component updates", () => {
@@ -48,15 +58,36 @@ test("direct UI edit contract rejects out-of-bounds files", () => {
         summary: "Attempt an out-of-bounds edit.",
         files: [
           {
-            path: "src/lib/unsafe.ts",
+            path: "package.json",
             kind: "source",
-            content: "export const unsafe = true;\n",
+            content: '{ "name": "unsafe" }\n',
           },
         ],
         notes: [],
       }),
     /outside the allowed direct UI edit surface/i,
   );
+});
+
+test("direct UI edit contract accepts src/lib and src/routes files", () => {
+  const result = directUiEditResultSchema.parse({
+    summary: "Add a route helper and a utility.",
+    files: [
+      {
+        path: "src/routes/Dashboard.tsx",
+        kind: "source",
+        content: "export default function Dashboard() { return <div>Dashboard</div>; }\n",
+      },
+      {
+        path: "src/lib/format.ts",
+        kind: "source",
+        content: "export function formatDate(d: Date) { return d.toISOString(); }\n",
+      },
+    ],
+    notes: [],
+  });
+
+  assert.equal(result.files.length, 2);
 });
 
 test("edit no-op message no longer hardcodes testimonials-style content as unsupported structure", () => {

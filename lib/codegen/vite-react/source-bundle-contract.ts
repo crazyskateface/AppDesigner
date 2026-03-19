@@ -8,7 +8,9 @@ export function isAllowedDirectSourceEditPath(path: string) {
     path === "src/styles.css" ||
     path === "src/app-meta.ts" ||
     /^src\/components\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path) ||
-    /^src\/pages\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path)
+    /^src\/pages\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path) ||
+    /^src\/routes\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.(ts|tsx)$/.test(path) ||
+    /^src\/lib\/(?:[A-Za-z0-9-]+\/)*[A-Za-z0-9-]+\.ts$/.test(path)
   );
 }
 
@@ -114,7 +116,7 @@ export const generatedSourceBundleJsonSchema: Record<string, unknown> = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "section"],
+        required: ["name", "section", "version"],
         properties: {
           name: { type: "string", minLength: 1 },
           version: { type: ["string", "null"], minLength: 1 },

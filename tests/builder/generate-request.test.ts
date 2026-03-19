@@ -179,31 +179,29 @@ test("builder generation request uses direct source edit mode for common UI edit
   assert.match(response.assistantMessage, /prepared a direct source edit/i);
 });
 
-test("builder generation request falls back to AppSpec edit mode for schema-oriented page changes", async () => {
+test("builder generation request routes page edits through direct source edit", async () => {
   const currentSpec = generateFallbackAppSpec("Build a CRM for a solo consultant.");
-  const nextSpec = {
-    ...currentSpec,
-    pages: [
-      ...currentSpec.pages,
-      {
-        id: "settings",
-        title: "Settings",
-        pageType: "settings" as const,
-        pageLayout: "stack" as const,
-        entityIds: [],
-        sections: [
+
+  globalThis.__appDesignerRuntimeService__ = {
+    getRuntimeWorkspaceFiles() {
+      return {
+        runtimeId: "runtime-1",
+        workspaceId: "workspace-1",
+        files: [
           {
-            id: "settings-form",
-            type: "form" as const,
-            title: "Settings",
-            placement: "main" as const,
-            emphasis: "default" as const,
+            path: "src/App.tsx",
+            kind: "source" as const,
+            content: "export default function App() { return <main>CRM</main>; }\n",
+          },
+          {
+            path: "src/styles.css",
+            kind: "source" as const,
+            content: "body { font-family: sans-serif; }\n",
           },
         ],
-      },
-    ],
-    navigation: [...currentSpec.navigation, { id: "settings-nav", label: "Settings", pageId: "settings" }],
-  };
+      };
+    },
+  } as never;
 
   const response = await resolveBuilderGenerateRequest(
     {
@@ -220,12 +218,55 @@ test("builder generation request falls back to AppSpec edit mode for schema-orie
           summary: "Ready to edit.",
           questions: [],
         },
-        app_spec: nextSpec,
+        direct_ui_edit: {
+          summary: "Added a settings page with a basic form.",
+          files: [
+            {
+              path: "src/pages/SettingsPage.tsx",
+              kind: "source",
+              content: "export default function SettingsPage() { return <main><form><label>Name</label><input /></form></main>; }\n",
+            },
+            {
+              path: "src/App.tsx",
+              kind: "source",
+              content: "import SettingsPage from './pages/SettingsPage';\nexport default function App() { return <main>CRM<SettingsPage /></main>; }\n",
+            },
+          ],
+          notes: [],
+        },
       }),
     },
   );
 
   assert.equal(response.status, "generation_ready");
+  assert.equal(response.directEdit?.strategy, "direct-ui-source-edit");
+  assert.match(response.assistantMessage, /prepared a direct source edit/i);
+});
+
+test("builder generation request returns unchanged for out-of-scope infrastructure requests", async () => {
+  const currentSpec = generateFallbackAppSpec("Build a CRM for a solo consultant.");
+
+  const response = await resolveBuilderGenerateRequest(
+    {
+      prompt: "Add Stripe checkout integration for payments.",
+      mode: "edit",
+      currentSpec,
+      runtimeId: "runtime-1",
+      clarificationAnswers: [],
+    },
+    {
+      provider: new StubProvider({
+        clarification_decision: {
+          decision: "build-now",
+          summary: "Ready to proceed.",
+          questions: [],
+        },
+      }),
+    },
+  );
+
+  assert.equal(response.status, "generation_ready");
+  assert.equal(response.changeStatus, "unchanged");
   assert.equal(response.directEdit, undefined);
-  assert.equal(response.appSpec.pages.length, currentSpec.pages.length + 1);
+  assert.match(response.assistantMessage, /outside the app source tree/i);
 });
